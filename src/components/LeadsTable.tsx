@@ -1,7 +1,7 @@
 "use client";
 
 import { Lead } from "@/types";
-import { ExternalLink, Mail, Star, ChevronUp, ChevronDown } from "lucide-react";
+import { ExternalLink, Mail, ChevronUp, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 interface LeadsTableProps {
@@ -43,26 +43,22 @@ export function LeadsTable({ leads }: LeadsTableProps) {
     );
 
   const cols: { key: SortKey; label: string }[] = [
-    { key: "company_name", label: "Company" },
-    { key: "email", label: "Email" },
-    { key: "website", label: "Website" },
-    { key: "phone", label: "Phone" },
-    { key: "city", label: "City" },
-    { key: "state", label: "State" },
-    { key: "rating", label: "Rating" },
-    { key: "reviews", label: "Reviews" },
+    { key: "company_name", label: "الشركة" },
+    { key: "email", label: "الإيميل" },
+    { key: "website", label: "الموقع" },
+    { key: "city", label: "المقاطعة" },
+    { key: "state", label: "الولاية" },
   ];
 
   return (
     <div style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }} className="rounded-xl border">
-      {/* Header row */}
       <div className="flex items-center justify-between gap-4 p-4 border-b" style={{ borderColor: "var(--color-border)" }}>
         <h2 className="font-semibold text-sm uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
-          Results — {sorted.length} leads
+          النتائج — {sorted.length} leads
         </h2>
         <input
           type="text"
-          placeholder="Filter by name, email, city…"
+          placeholder="فلتر بالاسم، إيميل، مدينة..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
@@ -70,7 +66,6 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         />
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -93,8 +88,8 @@ export function LeadsTable({ leads }: LeadsTableProps) {
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
-                  No leads yet. Run a search to collect leads.
+                <td colSpan={5} className="px-4 py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
+                  لا توجد نتائج بعد. شغّل بحثاً لجمع الـ leads.
                 </td>
               </tr>
             ) : (
@@ -109,12 +104,12 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                   </td>
                   <td className="px-4 py-3">
                     {lead.email ? (
-                      <a
+                      
                         href={`mailto:${lead.email}`}
                         className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors"
                       >
                         <Mail size={12} />
-                        <span className="truncate max-w-[180px]">{lead.email}</span>
+                        <span className="truncate max-w-[200px]">{lead.email}</span>
                       </a>
                     ) : (
                       <span style={{ color: "var(--color-text-muted)" }}>—</span>
@@ -122,11 +117,11 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                   </td>
                   <td className="px-4 py-3">
                     {lead.website ? (
-                      <a
+                      
                         href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors truncate max-w-[160px]"
+                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors truncate max-w-[180px]"
                       >
                         <ExternalLink size={11} />
                         {lead.website.replace(/^https?:\/\/(www\.)?/, "")}
@@ -135,32 +130,20 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                       <span style={{ color: "var(--color-text-muted)" }}>—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--color-text-dim)" }}>
-                    {lead.phone || "—"}
-                  </td>
                   <td className="px-4 py-3" style={{ color: "var(--color-text-dim)" }}>
                     {lead.city || "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className="px-2 py-0.5 rounded text-xs font-mono font-medium"
-                      style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}
-                    >
-                      {lead.state || "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {lead.rating ? (
-                      <span className="flex items-center gap-1 text-amber-400">
-                        <Star size={12} fill="currentColor" />
-                        {lead.rating.toFixed(1)}
+                    {lead.state ? (
+                      <span
+                        className="px-2 py-0.5 rounded text-xs font-mono font-medium"
+                        style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}
+                      >
+                        {lead.state}
                       </span>
                     ) : (
                       <span style={{ color: "var(--color-text-muted)" }}>—</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3" style={{ color: "var(--color-text-dim)" }}>
-                    {lead.reviews?.toLocaleString() ?? "—"}
                   </td>
                 </tr>
               ))
