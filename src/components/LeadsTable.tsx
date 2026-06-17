@@ -58,29 +58,22 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         </h2>
         <input
           type="text"
-          placeholder="فلتر بالاسم، إيميل، مدينة..."
+          placeholder="فلتر..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
           className="rounded-lg border px-3 py-1.5 text-sm outline-none focus:border-blue-500 transition-colors w-64 placeholder:text-slate-600"
         />
       </div>
-
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderColor: "var(--color-border)" }} className="border-b">
               {cols.map((c) => (
-                <th
-                  key={c.key}
-                  onClick={() => handleSort(c.key)}
+                <th key={c.key} onClick={() => handleSort(c.key)}
                   className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none whitespace-nowrap"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  <span className="flex items-center gap-1">
-                    {c.label}
-                    <SortIcon col={c.key} />
-                  </span>
+                  style={{ color: "var(--color-text-muted)" }}>
+                  <span className="flex items-center gap-1">{c.label}<SortIcon col={c.key} /></span>
                 </th>
               ))}
             </tr>
@@ -89,61 +82,42 @@ export function LeadsTable({ leads }: LeadsTableProps) {
             {sorted.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
-                  لا توجد نتائج بعد. شغّل بحثاً لجمع الـ leads.
+                  لا توجد نتائج بعد.
                 </td>
               </tr>
             ) : (
               sorted.map((lead, i) => (
-                <tr
-                  key={lead.id ?? i}
-                  className="border-b transition-colors hover:bg-white/[0.02]"
-                  style={{ borderColor: "var(--color-border)" }}
-                >
+                <tr key={lead.id ?? i} className="border-b transition-colors hover:bg-white/[0.02]"
+                  style={{ borderColor: "var(--color-border)" }}>
                   <td className="px-4 py-3 font-medium max-w-[200px] truncate" style={{ color: "var(--color-text)" }}>
                     {lead.company_name}
                   </td>
                   <td className="px-4 py-3">
                     {lead.email ? (
-                      
-                        href={`mailto:${lead.email}`}
-                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors"
-                      >
+                      <span className="flex items-center gap-1.5 text-blue-400">
                         <Mail size={12} />
                         <span className="truncate max-w-[200px]">{lead.email}</span>
-                      </a>
-                    ) : (
-                      <span style={{ color: "var(--color-text-muted)" }}>—</span>
-                    )}
+                      </span>
+                    ) : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                   </td>
                   <td className="px-4 py-3">
                     {lead.website ? (
-                      
-                        href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors truncate max-w-[180px]"
-                      >
+                      <a href={lead.website.startsWith("http") ? lead.website : "https://" + lead.website}
+                        target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors truncate max-w-[180px]">
                         <ExternalLink size={11} />
                         {lead.website.replace(/^https?:\/\/(www\.)?/, "")}
                       </a>
-                    ) : (
-                      <span style={{ color: "var(--color-text-muted)" }}>—</span>
-                    )}
+                    ) : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                   </td>
-                  <td className="px-4 py-3" style={{ color: "var(--color-text-dim)" }}>
-                    {lead.city || "—"}
-                  </td>
+                  <td className="px-4 py-3" style={{ color: "var(--color-text-dim)" }}>{lead.city || "—"}</td>
                   <td className="px-4 py-3">
                     {lead.state ? (
-                      <span
-                        className="px-2 py-0.5 rounded text-xs font-mono font-medium"
-                        style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}
-                      >
+                      <span className="px-2 py-0.5 rounded text-xs font-mono font-medium"
+                        style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>
                         {lead.state}
                       </span>
-                    ) : (
-                      <span style={{ color: "var(--color-text-muted)" }}>—</span>
-                    )}
+                    ) : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
                   </td>
                 </tr>
               ))
