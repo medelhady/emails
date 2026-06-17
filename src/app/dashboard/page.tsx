@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Building2, Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X } from "lucide-react";
+import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, Building2 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { SearchForm } from "@/components/SearchForm";
 import { LeadsTable } from "@/components/LeadsTable";
@@ -15,10 +15,6 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [manualCompany, setManualCompany] = useState("");
-  const [manualWebsite, setManualWebsite] = useState("");
-  const [manualCity, setManualCity] = useState("");
-  const [manualState, setManualState] = useState("");
   const [manualEmails, setManualEmails] = useState("");
   const [addingEmails, setAddingEmails] = useState(false);
   const [addResult, setAddResult] = useState<string | null>(null);
@@ -31,7 +27,6 @@ export default function Dashboard() {
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
   const totalEmails = leads.filter((l) => l.email).length;
-  const uniqueCompanies = new Set(leads.map((l) => l.company_name)).size;
 
   const handleSearch = async (params: SearchParams) => {
     setIsLoading(true);
@@ -86,15 +81,15 @@ export default function Dashboard() {
       const { data: existing } = await supabase.from("leads").select("id").eq("email", email).limit(1);
       if (existing && existing.length > 0) { skipped++; continue; }
       const { error } = await supabase.from("leads").insert([{
-        company_name: manualCompany || "Manual Entry",
-        website: manualWebsite || "",
+        company_name: "Manual Entry",
+        website: "",
         email,
-        city: manualCity || "",
-        state: manualState || "",
+        city: "",
+        state: "",
       }]);
       if (!error) added++;
     }
-    setAddResult(`تم إضافة ${added} إيميل — تخطي ${skipped} مكرر`);
+    setAddResult(`✅ تم إضافة ${added} — تخطي ${skipped} مكرر`);
     setManualEmails("");
     await loadLeads();
     setAddingEmails(false);
@@ -136,51 +131,29 @@ export default function Dashboard() {
           <div className="w-full max-w-md rounded-xl border p-6 space-y-4"
             style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold" style={{ color: "var(--color-text)" }}>إضافة إيميلات يدوياً</h2>
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: "var(--color-text)" }}>Add Emails</h2>
+                <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                  {leads.length} leads مجموع
+                </p>
+              </div>
               <button onClick={() => setShowModal(false)} className="cursor-pointer" style={{ color: "var(--color-text-muted)" }}>
                 <X size={18} />
               </button>
             </div>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>اسم الشركة</label>
-                  <input value={manualCompany} onChange={(e) => setManualCompany(e.target.value)} placeholder="ABC Property..."
-                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }} />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>الموقع</label>
-                  <input value={manualWebsite} onChange={(e) => setManualWebsite(e.target.value)} placeholder="example.com"
-                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>المدينة</label>
-                  <input value={manualCity} onChange={(e) => setManualCity(e.target.value)} placeholder="Los Angeles"
-                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }} />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>الولاية</label>
-                  <input value={manualState} onChange={(e) => setManualState(e.target.value)} placeholder="CA"
-                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>
-                  الإيميلات <span className="opacity-60">(واحد في كل سطر أو مفصولة بفاصلة)</span>
-                </label>
-                <textarea value={manualEmails} onChange={(e) => setManualEmails(e.target.value)}
-                  placeholder={"john@company.com\ninfo@realty.com"} rows={5}
-                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500 resize-none font-mono"
-                  style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }} />
-              </div>
+
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>
+                الإيميلات <span className="opacity-60">(واحد في كل سطر أو مفصولة بفاصلة)</span>
+              </label>
+              <textarea value={manualEmails} onChange={(e) => setManualEmails(e.target.value)}
+                placeholder={"john@company.com\ninfo@realty.com\ncontact@pm.com"} rows={8}
+                className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500 resize-none font-mono"
+                style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }} />
             </div>
+
             {addResult && <p className="text-sm text-emerald-400">{addResult}</p>}
+
             <div className="flex gap-3 pt-1">
               <button onClick={handleAddEmails} disabled={addingEmails || !manualEmails.trim()}
                 className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 cursor-pointer"
@@ -198,10 +171,9 @@ export default function Dashboard() {
       )}
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <StatCard label="Total Leads" value={leads.length} icon={<Users size={20} />} color="blue" description="Rows saved in Supabase" />
           <StatCard label="Emails Found" value={totalEmails} icon={<Mail size={20} />} color="green" description="Verified email addresses" />
-          <StatCard label="Companies" value={uniqueCompanies} icon={<Building2 size={20} />} color="amber" description="Unique businesses scraped" />
         </div>
         <SearchForm onSearch={handleSearch} isLoading={isLoading} />
         {error && (
