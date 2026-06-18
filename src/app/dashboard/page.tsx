@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, Building2, ExternalLink, ChevronDown } from "lucide-react";
+import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, ExternalLink, ChevronDown } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { SearchForm } from "@/components/SearchForm";
-import { LeadsTable } from "@/components/LeadsTable";
 import { supabase } from "@/lib/supabase";
 import { Lead, SearchParams, SearchResult } from "@/types";
 
@@ -118,7 +117,7 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-3">
 
-            {/* ── Leads Dropdown ── */}
+            {/* Leads Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setShowLeadsDropdown((v) => !v)}
@@ -207,14 +206,14 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* ── Add Emails ── */}
+            {/* Add Emails */}
             <button onClick={() => { setShowModal(true); setAddResult(null); }}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all cursor-pointer"
               style={{ background: "var(--color-surface)", borderColor: "var(--color-accent)", color: "var(--color-accent)" }}>
               <Plus size={14} />Add Emails
             </button>
 
-            {/* ── Export CSV ── */}
+            {/* Export CSV */}
             <button onClick={handleExport} disabled={exporting || leads.length === 0}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text-dim)" }}>
@@ -224,7 +223,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ── Add Emails Modal ── */}
+      {/* Add Emails Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)" }}
@@ -289,7 +288,6 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-        <LeadsTable leads={leads} />
       </main>
     </div>
   );
