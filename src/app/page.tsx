@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, ExternalLink, ChevronDown } from "lucide-react";
+import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, ExternalLink, ChevronDown, Building2 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { SearchForm } from "@/components/SearchForm";
 import { supabase } from "@/lib/supabase";
@@ -9,6 +9,7 @@ import { Lead, SearchParams, SearchResult } from "@/types";
 
 export default function Dashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [searchLeads, setSearchLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastResult, setLastResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function Dashboard() {
     setIsLoading(true);
     setError(null);
     setLastResult(null);
+    setSearchLeads([]);
     try {
       const res = await fetch("/api/search", {
         method: "POST",
@@ -42,6 +44,7 @@ export default function Dashboard() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Search failed"); return; }
       setLastResult(data as SearchResult);
+      setSearchLeads((data as SearchResult).leads ?? []);
       await loadLeads();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Network error");
@@ -184,8 +187,7 @@ export default function Dashboard() {
                                 </td>
                                 <td className="px-4 py-2.5">
                                   {lead.website ? (
-                                    <a
-                                      href={lead.website.startsWith("http") ? lead.website : "https://" + lead.website}
+                                    <a href={lead.website.startsWith("http") ? lead.website : "https://" + lead.website}
                                       target="_blank" rel="noopener noreferrer"
                                       className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors truncate max-w-[190px]">
                                       <ExternalLink size={10} className="shrink-0" />
@@ -272,19 +274,72 @@ export default function Dashboard() {
           <StatCard label="Total Leads" value={leads.length} icon={<Users size={20} />} color="blue" description="Rows saved in Supabase" />
           <StatCard label="Emails Found" value={totalEmails} icon={<Mail size={20} />} color="green" description="Verified email addresses" />
         </div>
+
         <SearchForm onSearch={handleSearch} isLoading={isLoading} />
+
         {error && (
           <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             <div><p className="font-medium">Error</p><p className="opacity-80">{error}</p></div>
           </div>
         )}
+
         {lastResult && (
           <div className="flex items-start gap-3 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
             <CheckCircle size={16} className="mt-0.5 shrink-0" />
             <div>
               <p className="font-medium">Search complete</p>
               <p className="opacity-80">Found {lastResult.stats.companiesFound} companies → {lastResult.stats.emailsFound} emails, {lastResult.stats.skippedDuplicates} duplicates skipped.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Search Results Table */}
+        {searchLeads.length > 0 && (
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
+            <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: "var(--color-border)" }}>
+              <Building2 size={14} className="text-blue-400" />
+              <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                نتائج البحث — {searchLeads.length}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: "var(--color-border)" }}>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>الشركة</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>الإيميل</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>الموقع</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {searchLeads.map((lead, i) => (
+                    <tr key={lead.id ?? i} className="border-b hover:bg-white/[0.02] transition-colors" style={{ borderColor: "var(--color-border)" }}>
+                      <td className="px-4 py-3 font-medium max-w-[200px] truncate" style={{ color: "var(--color-text)" }}>
+                        {lead.company_name}
+                      </td>
+                      <td className="px-4 py-3">
+                        {lead.email ? (
+                          <span className="flex items-center gap-1.5 text-blue-400">
+                            <Mail size={12} />
+                            <span className="truncate max-w-[200px]">{lead.email}</span>
+                          </span>
+                        ) : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {lead.website ? (
+                          <a href={lead.website.startsWith("http") ? lead.website : "https://" + lead.website}
+                            target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors truncate max-w-[180px]">
+                            <ExternalLink size={11} />
+                            {lead.website.replace(/^https?:\/\/(www\.)?/, "")}
+                          </a>
+                        ) : <span style={{ color: "var(--color-text-muted)" }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
