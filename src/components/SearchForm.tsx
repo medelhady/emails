@@ -176,49 +176,52 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
         </div>
 
-        {/* حقل الكلمات المفتاحية مع الأزرار المدمجة */}
+        {/* حقل الكلمات المفتاحية مع التوزيع المريح والواسع للأزرار */}
         <div className="space-y-2 flex flex-col relative">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-400">كلمة البحث (Keyword)</label>
-          <div className="relative flex items-center w-full group">
-            <select 
-              value={keyword} 
-              onChange={(e) => setKeyword(e.target.value)} 
-              disabled={!state || keywordsLoading || availableKeywords.length === 0} 
-              className="w-full rounded-xl border border-slate-800 bg-slate-950/60 pl-32 pr-4 py-3 text-sm text-slate-100 outline-none transition-all duration-200 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 disabled:opacity-40 disabled:cursor-not-allowed appearance-none cursor-pointer"
-            >
-              <option value="" className="bg-slate-950">
-                {!state ? "Select State first..." : keywordsLoading ? "Loading keywords..." : availableKeywords.length === 0 ? "No keywords available..." : "Select a Keyword..."}
-              </option>
-              {availableKeywords.map((k) => <option key={k.id} value={k.keyword} className="bg-slate-950">{k.keyword}</option>)}
-            </select>
-
-            {/* الأزرار المدمجة بشكل احترافي وأنيق جهة اليسار */}
-            <div className="absolute left-3 flex items-center gap-1.5 z-10">
-              <button 
-                ref={buttonListRef} 
-                type="button" 
-                disabled={!state || availableKeywords.length === 0} 
-                onClick={() => setShowMiniList(!showMiniList)} 
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-                title="عرض القائمة"
+          
+          <div className="flex items-center gap-2 w-full">
+            {/* القائمة المنسدلة تأخذ المساحة الكاملة والراحة التامة للأسماء الطويلة */}
+            <div className="relative flex-1">
+              <select 
+                value={keyword} 
+                onChange={(e) => setKeyword(e.target.value)} 
+                disabled={!state || keywordsLoading || availableKeywords.length === 0} 
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition-all duration-200 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                🗂️ <span className="hidden sm:inline">القائمة</span>
-              </button>
-              <button 
-                type="button" 
-                disabled={!state} 
-                onClick={() => setShowBulkModal(true)} 
-                className="flex items-center justify-center w-8 h-8 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-600/20 transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-                title="إضافة كلمات"
-              >
-                +
-              </button>
+                <option value="" className="bg-slate-950">
+                  {!state ? "Select State first..." : keywordsLoading ? "Loading keywords..." : availableKeywords.length === 0 ? "No keywords available..." : "Select a Keyword..."}
+                </option>
+                {availableKeywords.map((k) => <option key={k.id} value={k.keyword} className="bg-slate-950">{k.keyword}</option>)}
+              </select>
             </div>
+
+            {/* الأزرار مصفوفة بجانب الحقل بشكل منفصل وأنيق دون تداخل */}
+            <button 
+              ref={buttonListRef} 
+              type="button" 
+              disabled={!state || availableKeywords.length === 0} 
+              onClick={() => setShowMiniList(!showMiniList)} 
+              className="flex items-center gap-1.5 h-[46px] px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer whitespace-nowrap shadow-md"
+              title="عرض القائمة"
+            >
+              🗂️ <span>القائمة</span>
+            </button>
+            
+            <button 
+              type="button" 
+              disabled={!state} 
+              onClick={() => setShowBulkModal(true)} 
+              className="flex items-center justify-center w-12 h-[46px] bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xl font-bold shadow-lg shadow-blue-600/20 transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+              title="إضافة كلمات"
+            >
+              +
+            </button>
           </div>
 
-          {/* القائمة المنسدلة العائمة والمطورة جمالياً */}
+          {/* قائمة الكلمات الطائرة تظهر بشكل ممتاز أسفل الصندوق الواسع */}
           {showMiniList && (
-            <div ref={miniListRef} className="absolute left-0 top-[76px] z-30 w-80 rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
+            <div ref={miniListRef} className="absolute left-0 top-[82px] z-30 w-80 rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/40 rounded-t-xl">
                 <span className="text-xs font-bold text-slate-400">تتبع الكلمات الجاهزة</span>
                 <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20 font-medium">➜ النشط حالياً</span>
@@ -253,11 +256,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           )}
         </div>
 
-        {/* زر البحث الرئيسي المحسن */}
+        {/* زر البحث الرئيسي */}
         <button 
           type="submit" 
           disabled={isLoading || !state || !keyword} 
-          className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-xl shadow-blue-600/10 transition-all duration-200 hover:shadow-blue-600/20 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none cursor-pointer flex items-center justify-center gap-2"
+          className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-xl shadow-blue-600/10 transition-all duration-200 hover:shadow-blue-600/20 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none cursor-pointer flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <>
@@ -273,7 +276,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         </button>
       </form>
 
-      {/* مودال إدخال الكلمات الجماعي المطور */}
+      {/* مودال إدخال الكلمات الجماعي */}
       {showBulkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
