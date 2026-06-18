@@ -120,27 +120,27 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                   className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none whitespace-nowrap"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  <div className="flex items-center gap-4 justify-between">
+                  <div className="flex items-center gap-2">
                     <span className="flex items-center gap-1">
                       {c.label}
                       <SortIcon col={c.key} />
                     </span>
 
-                    {/* أزرار ثابتة ومرئية دائماً لمنع مشاكل الـ CSS */}
+                    {/* زر النسخ ملاصق ومحمي وثابت دائماً بجانب السهم */}
                     {c.copyable && (
                       <button
                         onClick={(e) =>
                           handleCopyColumn(e, c.key as "email" | "website")
                         }
                         title={`نسخ كل ${c.label}`}
-                        className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-blue-400 transition-colors ml-2"
+                        className="p-1 rounded bg-white/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-colors flex items-center justify-center inline-flex"
                       >
                         {copiedColumn === c.key ? (
-                          <span className="flex items-center gap-1 text-green-400 text-[10px] font-normal normal-case">
+                          <span className="flex items-center gap-1 text-green-400 text-[10px] font-normal normal-case px-1">
                             <Check size={11} /> تم!
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1 text-[10px] font-normal normal-case text-slate-400">
+                          <span className="flex items-center gap-1 text-[10px] font-normal normal-case text-blue-400 hover:text-white px-1">
                             <Copy size={11} /> نسخ
                           </span>
                         )}
