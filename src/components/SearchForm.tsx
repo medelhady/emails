@@ -151,7 +151,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
         </div>
 
-        {/* حقل اختيار الكلمات المفتاحية مع المنبثقة المحسنة */}
+        {/* حقل اختيار الكلمات المفتاحية مع المنبثقة المحسنة للأعلى */}
         <div className="space-y-2.5 flex flex-col relative" ref={dropdownRef}>
           <label className="text-xs font-bold uppercase tracking-wider text-slate-400 text-right">كلمة البحث أو النطاق (KEYWORD / DOMAIN)</label>
           <div className="flex items-center gap-2 w-full flex-row-reverse">
@@ -186,9 +186,9 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </div>
           </div>
 
-          {/* 🚨 النافذة المنبثقة بعد معالجة أزمة الاتساع والزاوية الضيقة */}
+          {/* 🚨 النافذة المنبثقة تفتح للأعلى (bottom-[55px]) فوق الحقول بشكل كامل وممتاز */}
           {isDropdownOpen && (
-            <div className="absolute left-0 right-0 top-[85px] z-[9999] w-full rounded-2xl border border-slate-800 bg-slate-950/98 shadow-2xl p-4 space-y-3 text-right animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute left-0 right-0 bottom-[55px] z-[9999] w-full rounded-2xl border border-slate-800 bg-slate-950/98 shadow-2xl p-4 space-y-3 text-right animate-in fade-in slide-in-from-bottom-2 duration-150">
               <div className="border-b border-slate-800/80 pb-2 flex items-center justify-between flex-row-reverse">
                 <span className="text-xs font-bold text-slate-400">تتبع الكلمات الجاهزة ({availableKeywords.length} كلمة)</span>
                 <span className="text-[10px] text-slate-500 font-mono">Supabase Server Sync</span>
