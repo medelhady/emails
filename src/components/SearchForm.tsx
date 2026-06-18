@@ -50,8 +50,8 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       setCity("");
       return;
     }
-    const selectedStateInfo = usStates.find(s => s.name === state || s.id === state);
-    if (selectedStateInfo) setAvailableCities(selectedStateInfo.cities);
+    const res = usStates.find(s => s.name === state || s.id === state);
+    if (res) setAvailableCities(res.cities);
     setCity(""); 
   }, [state]);
 
@@ -86,14 +86,14 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     if (!state || !bulkKeywordsText.trim()) return;
 
     setIsSavingBulk(true);
-    const keywordsArray = bulkKeywordsText.split("\n").map(k => k.trim()).filter(k => k.length > 0);
-    if (keywordsArray.length === 0) {
+    const arr = bulkKeywordsText.split("\n").map(k => k.trim()).filter(k => k.length > 0);
+    if (arr.length === 0) {
       setIsSavingBulk(false);
       return;
     }
 
     try {
-      const rows = keywordsArray.map(kw => ({ state_name: state, keyword: kw, status: 'ready' }));
+      const rows = arr.map(kw => ({ state_name: state, keyword: kw, status: 'ready' }));
       const { error } = await supabase.from("state_keywords").insert(rows);
       if (error) throw error;
       await fetchKeywords(state);
@@ -113,13 +113,14 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     const activeKw = availableKeywords.find(k => k.keyword === keyword);
     if (activeKw) {
       try {
-        await supabase.from("state_keywords").update({ status: 'searching', last_searched_at: new Date().toISOString() }).eq("id", activeKw.id);
+        await supabase.from("state_keywords")
+          .update({ status: 'searching', last_searched_at: new Date().toISOString() })
+          .eq("id", activeKw.id);
         fetchKeywords(state);
       } catch (err) {
         console.error(err);
       }
     }
-
     onSearch({ keyword, maxResults: 50, state, city });
   };
 
@@ -164,4 +165,48 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
           {showMiniList && (
             <div ref={miniListRef} className="absolute left-0 top-[64px] z-30 w-72 rounded-xl border p-3 shadow-xl" style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}>
-              <div className="text-[11px]
+              <div className="text-[11px] font-bold pb-1.5 mb-1.5 border-b border-gray-700 text-gray-400 flex justify-between">
+                <span>الكلمات والتتبع:</span>
+                <span className="text-blue-400">➜ التوقف الحالي</span>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                {availableKeywords.map((k, index) => {
+                  const isCurrent = lastSearchedItem?.id === k.id;
+                  return (
+                    <div key={k.id} onClick={() => { setKeyword(k.keyword); setShowMiniList(false); }} className={`flex items-center justify-between p-1.5 px-2 rounded-md text-xs cursor-pointer ${isCurrent ? 'bg-blue-600/20 text-blue-300' : 'text-gray-300 hover:bg-gray-800'}`}>
+                      <span className="font-mono text-gray-500">{index + 1}.</span>
+                      <span className="flex-1 mr-2 text-right truncate">{k.keyword}</span>
+                      {isCurrent && <span className="text-blue-400 font-bold">➜</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button type="submit" disabled={isLoading || !state || !keyword} className="w-full py-2 px-4 rounded-lg bg-blue-600 text-white font-medium text-sm disabled:opacity-50">
+          {isLoading ? "Searching..." : "Search Leads"}
+        </button>
+      </form>
+
+      {showBulkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border p-5 space-y-4 shadow-2xl" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
+            <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: "var(--color-border)" }}>
+              <h3 className="text-sm font-bold text-white">➕ إضافة مجموعة كلمات مفتاحية</h3>
+              <button type="button" onClick={() => setShowBulkModal(false)} className="text-gray-400 text-sm">✕</button>
+            </div>
+            <form onSubmit={handleBulkAddKeywords} className="space-y-3">
+              <textarea value={bulkKeywordsText} onChange={(e) => setBulkKeywordsText(e.target.value)} rows={6} required placeholder="Word 1&#10;Word 2" className="w-full rounded-lg border p-3 text-xs bg-gray-950 text-white border-gray-800 resize-none" />
+              <div className="flex justify-end gap-2 text-xs">
+                <button type="button" onClick={() => setShowBulkModal(false)} className="px-3 py-1.5 bg-gray-800 text-white rounded-lg">إلغاء</button>
+                <button type="submit" disabled={isSavingBulk || !bulkKeywordsText.trim()} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg">{isSavingBulk ? "جاري الرفع..." : "حفظ"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
