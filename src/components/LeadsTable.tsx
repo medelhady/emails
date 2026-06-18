@@ -1,132 +1,115 @@
 "use client";
 
 import { useState } from "react";
-import { Lead } from "@/types";
 
-interface LeadsTableProps {
-  leads: Lead[];
+interface LeadItem {
+  id: string;
+  company_name?: string | null; // اسم الشركة المضافة من نتائج البحث
+  email: string | null;
+  website: string | null;
+  created_at?: string;
 }
 
-export function LeadsTable({ leads }: LeadsTableProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [copyFrom, setCopyFrom] = useState("1");
-  const [copyTo, setCopyTo] = useState("");
-  const [copiedFeedback, setCopiedFeedback] = useState(false);
+interface LeadsTableProps {
+  leads: LeadItem[];
+  isLoading: boolean;
+}
 
-  // الفلترة بناءً على حقل البحث
-  const filteredLeads = leads.filter(lead => 
+export function LeadsTable({ leads, isLoading }: LeadsTableProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // 🛡️ تصفية صارمة وعميقة لمنع تكرار الإيميلات والمواقع الإلكترونية نهائياً
+  const uniqueLeads = leads.filter((lead, index, self) => {
+    // 1. إذا تطابق الإيميل مع عنصر سابق (تجاهل حالة الأحرف)
+    if (lead.email) {
+      return self.findIndex(l => l.email?.toLowerCase() === lead.email?.toLowerCase()) === index;
+    }
+    // 2. إذا لم يكن هناك إيميل وتطابق الموقع مع عنصر سابق
+    if (lead.website) {
+      return self.findIndex(l => l.website?.toLowerCase() === lead.website?.toLowerCase()) === index;
+    }
+    return true;
+  });
+
+  // تطبيق البحث النصي على القائمة الفريدة المصفاة عبر كافة الحقول
+  const filteredLeads = uniqueLeads.filter(lead => 
+    lead.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.website?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // دالة نسخ النطاق المخصصة
-  const handleCopyRange = () => {
-    const fromIndex = parseInt(copyFrom) - 1;
-    const toIndex = parseInt(copyTo || filteredLeads.length.toString()) - 1;
-
-    if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex < 0 || toIndex >= filteredLeads.length || fromIndex > toIndex) {
-      alert("الرجاء تحديد نطاق صحيح متاح داخل الجدول!");
-      return;
-    }
-
-    const rangeItems = filteredLeads.slice(fromIndex, toIndex + 1);
-    const emailsList = rangeItems.map(l => l.email).filter(Boolean).join("\n");
-
-    if (!emailsList) {
-      alert("لا توجد إيميلات صالحة للنسخ في هذا النطاق!");
-      return;
-    }
-
-    navigator.clipboard.writeText(emailsList);
-    setCopiedFeedback(true);
-    setTimeout(() => setCopiedFeedback(false), 2000);
-  };
-
   return (
-    <div className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-6 space-y-4 shadow-xl">
+    <div className="w-full bg-slate-950/40 border border-slate-800/80 rounded-2xl p-6 space-y-4 shadow-xl text-slate-200">
       
-      {/* شريط التحكم العلوي */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-900 pb-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-base font-bold text-white">Leads — {filteredLeads.length}</h2>
-          {copiedFeedback && (
-            <span className="text-[11px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">✓ تم نسخ النطاق</span>
-          )}
+      {/* الرأس: شريط البحث النصي وعدد النتائج المحدث */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 flex-row-reverse">
+        <div className="flex items-center gap-2 flex-row-reverse">
+          <span className="text-base font-bold text-white">نتائج البحث — {filteredLeads.length}</span>
         </div>
-
-        {/* أدوات الفلترة والنسخ */}
-        <div className="flex flex-wrap items-center gap-3 justify-end">
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
-            <span className="text-slate-400">نسخ من</span>
-            <input 
-              type="number" 
-              value={copyFrom}
-              onChange={(e) => setCopyFrom(e.target.value)}
-              className="w-12 h-7 text-center bg-slate-950 border border-slate-800 rounded-lg outline-none text-white focus:border-blue-500 font-mono"
-            />
-            <span className="text-slate-400">إلى</span>
-            <input 
-              type="number" 
-              placeholder={filteredLeads.length.toString()} 
-              value={copyTo}
-              onChange={(e) => setCopyTo(e.target.value)}
-              className="w-12 h-7 text-center bg-slate-950 border border-slate-800 rounded-lg outline-none text-white focus:border-blue-500 font-mono"
-            />
-            <button
-              type="button"
-              onClick={handleCopyRange}
-              disabled={filteredLeads.length === 0}
-              className="mr-2 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium cursor-pointer"
-            >
-              نسخ الإيميلات
-            </button>
-          </div>
-
-          <input
-            type="text"
-            placeholder="بحث داخل النتائج..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-200 outline-none focus:border-blue-500 w-48 text-right"
-          />
-        </div>
+        <input
+          type="text"
+          placeholder="بحث سريع..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-blue-500 w-full sm:w-64 text-right"
+        />
       </div>
 
-      {/* جدول عرض البيانات */}
+      {/* جدول البيانات المتناسق مع لقطة الشاشة */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
+        <table className="w-full text-right text-xs border-collapse">
           <thead>
-            <tr className="border-b border-slate-900 text-slate-400 font-bold uppercase">
-              <th className="py-3 px-4 w-12 text-center">#</th>
-              <th className="py-3 px-4 text-right">الإيميل</th>
-              <th className="py-3 px-4 text-left">الموقع</th>
+            <tr className="border-b border-slate-800 text-slate-400 font-bold">
+              <th className="py-3 px-4 text-right">الموقع</th>
+              <th className="py-3 px-4 text-center">الإيميل</th>
+              <th className="py-3 px-4 text-right">الشركة</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-900/60 text-slate-300">
-            {filteredLeads.map((lead, index) => (
-              <tr key={index} className="hover:bg-slate-900/30 transition-colors">
-                <td className="py-3.5 px-4 text-center font-mono text-slate-600">
-                  {(index + 1).toString().padStart(2, '0')}
-                </td>
-                <td className="py-3.5 px-4 text-right font-mono text-blue-400">
-                  {lead.email || "—"}
-                </td>
-                <td className="py-3.5 px-4 text-left truncate max-w-xs text-slate-400">
-                  {lead.website ? (
-                    <a href={lead.website} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
-                      🔗 {lead.website}
-                    </a>
-                  ) : "—"}
-                </td>
-              </tr>
-            ))}
-
-            {filteredLeads.length === 0 && (
+          <tbody>
+            {isLoading ? (
               <tr>
-                <td colSpan={3} className="py-10 text-center text-slate-600">
-                  لا توجد ليدز متاحة حالياً للعرض أو البحث المكتوب...
-                </td>
+                <td colSpan={3} className="text-center py-8 text-slate-500">جاري تصفية البيانات وجلب النتائج الحصرية...</td>
               </tr>
+            ) : filteredLeads.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="text-center py-8 text-slate-500">لا توجد نتائج مطابقة أو اللائحة فارغة حالياً.</td>
+              </tr>
+            ) : (
+              filteredLeads.map((lead) => (
+                <tr key={lead.id} className="border-b border-slate-900 hover:bg-slate-900/40 transition-colors">
+                  
+                  {/* عمود الموقع الإلكتروني */}
+                  <td className="py-3.5 px-4 text-blue-400 font-mono truncate max-w-[240px]">
+                    {lead.website ? (
+                      <a 
+                        href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="hover:underline flex items-center gap-1 justify-end"
+                      >
+                        <span>🔗</span>
+                        <span className="truncate">{lead.website}</span>
+                      </a>
+                    ) : "—"}
+                  </td>
+
+                  {/* عمود البريد الإلكتروني (ممركز بالمنتصف) */}
+                  <td className="py-3.5 px-4 text-slate-300 font-mono text-center truncate max-w-[200px]">
+                    {lead.email ? (
+                      <div className="flex items-center gap-1 justify-center">
+                        <span>✉️</span>
+                        <span>{lead.email}</span>
+                      </div>
+                    ) : "—"}
+                  </td>
+
+                  {/* عمود الشركة (على اليمين) */}
+                  <td className="py-3.5 px-4 text-slate-100 font-medium max-w-[220px] truncate text-right">
+                    {lead.company_name ? lead.company_name : "—"}
+                  </td>
+
+                </tr>
+              ))
             )}
           </tbody>
         </table>
