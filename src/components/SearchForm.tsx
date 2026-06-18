@@ -98,7 +98,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       .filter(k => k.length > 0);
 
     if (arr.length === 0) {
-      setIsSavingBulk(false);
+      setIsSavingBulk(false)
       return;
     }
 
@@ -176,12 +176,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
         </div>
 
-        {/* حقل الكلمات المفتاحية مع التوزيع المريح والواسع للأزرار */}
+        {/* حقل الكلمات المفتاحية مع فتح القائمة إلى الأعلى */}
         <div className="space-y-2 flex flex-col relative">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-400">كلمة البحث (Keyword)</label>
           
           <div className="flex items-center gap-2 w-full">
-            {/* القائمة المنسدلة تأخذ المساحة الكاملة والراحة التامة للأسماء الطويلة */}
             <div className="relative flex-1">
               <select 
                 value={keyword} 
@@ -196,7 +195,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
               </select>
             </div>
 
-            {/* الأزرار مصفوفة بجانب الحقل بشكل منفصل وأنيق دون تداخل */}
             <button 
               ref={buttonListRef} 
               type="button" 
@@ -219,9 +217,9 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </button>
           </div>
 
-          {/* قائمة الكلمات الطائرة تظهر بشكل ممتاز أسفل الصندوق الواسع */}
+          {/* 🌟 تعديل هنا: القائمة تفتح إلى الأعلى الآن بشكل كامل ومريح للتتبع */}
           {showMiniList && (
-            <div ref={miniListRef} className="absolute left-0 top-[82px] z-30 w-80 rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
+            <div ref={miniListRef} className="absolute left-0 bottom-[54px] z-30 w-80 rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
               <div className="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/40 rounded-t-xl">
                 <span className="text-xs font-bold text-slate-400">تتبع الكلمات الجاهزة</span>
                 <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20 font-medium">➜ النشط حالياً</span>
