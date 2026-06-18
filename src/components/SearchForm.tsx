@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { SearchParams } from "@/types";
-import { usStates, CityInfo } from "@/data/usData"; // المسار الجديد هنا
+import { usStates, CityInfo } from "@/data/usData";
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -10,9 +10,14 @@ interface SearchFormProps {
 }
 
 export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
+  // الحقول الجديدة التي أضفناها
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [availableCities, setAvailableCities] = useState<CityInfo[]>([]);
+
+  // الحقول الأصلية المتوقعة من الـ SearchParams لتفادي خطأ الـ Build
+  const [keyword, setKeyword] = useState("");
+  const [maxResults, setMaxResults] = useState(50);
 
   // تحديث قائمة المقاطعات فور تغيير الولاية
   useEffect(() => {
@@ -33,11 +38,31 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch({ state, city });
+    // نرسل الحقول كاملة للـ API لحل مشكلة النوع (Type error)
+    onSearch({ 
+      keyword, 
+      maxResults, 
+      state, 
+      city 
+    });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-4 rounded-xl border bg-card text-card-foreground" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
+    <form onSubmit={handleSubmit} className="space-y-4 p-4 rounded-xl border" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
+      
+      {/* إذا كان تطبيقك يحتوي على خانة بحث نصية (Keyword) يمكنك إظهار هذا الحقل */}
+      <div className="space-y-2 flex flex-col">
+        <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>كلمة البحث (Keyword / Business Type)</label>
+        <input
+          type="text"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="e.g. Property Management, Real Estate..."
+          className="rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500"
+          style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
+        />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         
         {/* خانة اختيار الولاية */}
@@ -80,7 +105,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-colors disabled:opacity-50"
+        className="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer"
       >
         {isLoading ? "Searching..." : "Search Leads"}
       </button>
