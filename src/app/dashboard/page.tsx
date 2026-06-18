@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, Building2 } from "lucide-react";
+import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, Building2, ExternalLink, ChevronDown } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { SearchForm } from "@/components/SearchForm";
 import { LeadsTable } from "@/components/LeadsTable";
@@ -15,6 +15,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showLeadsDropdown, setShowLeadsDropdown] = useState(false);
+  const [leadsFilter, setLeadsFilter] = useState("");
   const [manualEmails, setManualEmails] = useState("");
   const [addingEmails, setAddingEmails] = useState(false);
   const [addResult, setAddResult] = useState<string | null>(null);
@@ -95,6 +97,12 @@ export default function Dashboard() {
     setAddingEmails(false);
   };
 
+  const filteredLeads = leads.filter((l) =>
+    leadsFilter === ""
+      ? true
+      : [l.email, l.website].some((v) => v?.toLowerCase().includes(leadsFilter.toLowerCase()))
+  );
+
   return (
     <div className="min-h-screen" style={{ background: "var(--color-bg)" }}>
       <header className="sticky top-0 z-10 border-b backdrop-blur-sm"
@@ -109,12 +117,112 @@ export default function Dashboard() {
               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Property Management Lead Generator</p>
             </div>
           </div>
+
           <div className="flex items-center gap-3">
+
+            {/* ── Leads Dropdown ── */}
+            <div className="relative">
+              <button
+                onClick={() => setShowLeadsDropdown((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all cursor-pointer"
+                style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text-dim)" }}>
+                <Users size={14} />
+                Leads
+                <span className="px-1.5 py-0.5 rounded text-xs font-mono"
+                  style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>
+                  {leads.length}
+                </span>
+                <ChevronDown size={12} className={`transition-transform ${showLeadsDropdown ? "rotate-180" : ""}`} />
+              </button>
+
+              {showLeadsDropdown && (
+                <>
+                  {/* backdrop */}
+                  <div className="fixed inset-0 z-20" onClick={() => setShowLeadsDropdown(false)} />
+
+                  <div className="absolute right-0 top-full mt-2 z-30 w-[500px] rounded-xl border shadow-2xl overflow-hidden"
+                    style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
+
+                    {/* Dropdown header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b"
+                      style={{ borderColor: "var(--color-border)" }}>
+                      <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                        Leads — {filteredLeads.length}
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="بحث..."
+                        value={leadsFilter}
+                        onChange={(e) => setLeadsFilter(e.target.value)}
+                        className="rounded-lg border px-3 py-1 text-xs outline-none focus:border-blue-500 w-40"
+                        style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                      />
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-y-auto max-h-[420px]">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0" style={{ background: "var(--color-surface)" }}>
+                          <tr className="border-b" style={{ borderColor: "var(--color-border)" }}>
+                            <th className="px-4 py-2.5 text-left font-medium uppercase tracking-wider w-1/2"
+                              style={{ color: "var(--color-text-muted)" }}>الإيميل</th>
+                            <th className="px-4 py-2.5 text-left font-medium uppercase tracking-wider w-1/2"
+                              style={{ color: "var(--color-text-muted)" }}>الموقع</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredLeads.length === 0 ? (
+                            <tr>
+                              <td colSpan={2} className="px-4 py-8 text-center text-xs"
+                                style={{ color: "var(--color-text-muted)" }}>لا توجد نتائج</td>
+                            </tr>
+                          ) : (
+                            filteredLeads.map((lead, i) => (
+                              <tr key={lead.id ?? i}
+                                className="border-b hover:bg-white/[0.03] transition-colors"
+                                style={{ borderColor: "var(--color-border)" }}>
+                                <td className="px-4 py-2.5">
+                                  {lead.email ? (
+                                    <span className="flex items-center gap-1.5 text-blue-400">
+                                      <Mail size={11} className="shrink-0" />
+                                      <span className="truncate max-w-[190px]">{lead.email}</span>
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: "var(--color-text-muted)" }}>—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2.5">
+                                  {lead.website ? (
+                                    <a
+                                      href={lead.website.startsWith("http") ? lead.website : "https://" + lead.website}
+                                      target="_blank" rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors truncate max-w-[190px]">
+                                      <ExternalLink size={10} className="shrink-0" />
+                                      {lead.website.replace(/^https?:\/\/(www\.)?/, "")}
+                                    </a>
+                                  ) : (
+                                    <span style={{ color: "var(--color-text-muted)" }}>—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ── Add Emails ── */}
             <button onClick={() => { setShowModal(true); setAddResult(null); }}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all cursor-pointer"
               style={{ background: "var(--color-surface)", borderColor: "var(--color-accent)", color: "var(--color-accent)" }}>
               <Plus size={14} />Add Emails
             </button>
+
+            {/* ── Export CSV ── */}
             <button onClick={handleExport} disabled={exporting || leads.length === 0}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text-dim)" }}>
@@ -124,6 +232,7 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* ── Add Emails Modal ── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)" }}
