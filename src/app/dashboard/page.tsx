@@ -86,8 +86,6 @@ export default function Dashboard() {
         company_name: "Manual Entry",
         website: "",
         email,
-        city: "",
-        state: "",
       }]);
       if (!error) added++;
     }
@@ -137,13 +135,9 @@ export default function Dashboard() {
 
               {showLeadsDropdown && (
                 <>
-                  {/* backdrop */}
                   <div className="fixed inset-0 z-20" onClick={() => setShowLeadsDropdown(false)} />
-
                   <div className="absolute right-0 top-full mt-2 z-30 w-[500px] rounded-xl border shadow-2xl overflow-hidden"
                     style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
-
-                    {/* Dropdown header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b"
                       style={{ borderColor: "var(--color-border)" }}>
                       <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
@@ -158,8 +152,6 @@ export default function Dashboard() {
                         style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
                       />
                     </div>
-
-                    {/* Table */}
                     <div className="overflow-y-auto max-h-[420px]">
                       <table className="w-full text-xs">
                         <thead className="sticky top-0" style={{ background: "var(--color-surface)" }}>
@@ -250,7 +242,6 @@ export default function Dashboard() {
                 <X size={18} />
               </button>
             </div>
-
             <div>
               <label className="block text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>
                 الإيميلات <span className="opacity-60">(واحد في كل سطر أو مفصولة بفاصلة)</span>
@@ -260,9 +251,7 @@ export default function Dashboard() {
                 className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500 resize-none font-mono"
                 style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }} />
             </div>
-
             {addResult && <p className="text-sm text-emerald-400">{addResult}</p>}
-
             <div className="flex gap-3 pt-1">
               <button onClick={handleAddEmails} disabled={addingEmails || !manualEmails.trim()}
                 className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 cursor-pointer"
