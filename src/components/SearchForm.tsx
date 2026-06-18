@@ -22,6 +22,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [maxResults, setMaxResults] = useState<number>(50); // 🌟 إشراك متغير حالة لعدد النتائج المطلوبة
 
   const [availableCities, setAvailableCities] = useState<CityInfo[]>([]);
   const [availableKeywords, setAvailableKeywords] = useState<KeywordItem[]>([]);
@@ -87,9 +88,8 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     setKeyword(""); 
   }, [state]);
 
-  // 🌟 وظيفة حذف كلمة محددة من سوبابيز
   const handleDeleteKeyword = async (id: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // منع إغلاق القائمة أو اختيار الكلمة بالخطأ عند الضغط على X
+    e.stopPropagation(); 
     try {
       const { error } = await supabase
         .from("state_keywords")
@@ -98,7 +98,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       
       if (error) throw error;
       
-      // تحديث القائمة محلياً فوراً لتجربة مستخدم سريعة
       setAvailableKeywords(prev => prev.filter(k => k.id !== id));
       if (keyword && availableKeywords.find(k => k.id === id)?.keyword === keyword) {
         setKeyword("");
@@ -108,14 +107,12 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     }
   };
 
-  // 🌟 وظيفة الإضافة الجماعية مع منع التكرار تماماً
   const handleBulkAddKeywords = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!state || !bulkKeywordsText.trim()) return;
 
     setIsSavingBulk(true);
     
-    // تنظيف الكلمات المدخلة وتحويلها إلى مصفوفة نظيفة
     const inputKeywords = bulkKeywordsText
       .split("\n")
       .map(k => k.trim())
@@ -127,7 +124,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     }
 
     try {
-      // 1. جلب الكلمات الحالية للولاية من قاعدة البيانات للمقارنة ومنع التكرار
       const { data: existingData } = await supabase
         .from("state_keywords")
         .select("keyword")
@@ -137,7 +133,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         existingData ? existingData.map(d => d.keyword.toLowerCase()) : []
       );
 
-      // 2. تصفية المدخلات لاستبعاد ما هو موجود مسبقاً (ومنع تكرار المدخلات الجديدة في نفس اللحظة)
       const uniqueNewKeywords = Array.from(new Set(inputKeywords))
         .filter(kw => !existingKeywordsSet.has(kw.toLowerCase()));
 
@@ -148,7 +143,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         return;
       }
 
-      // 3. بناء الصفوف الجديدة وضخها في سوبابيز
       const rows = uniqueNewKeywords.map(kw => ({
         state_name: state,
         keyword: kw,
@@ -183,7 +177,8 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         console.error(err);
       }
     }
-    onSearch({ keyword, maxResults: 50, state, city });
+    // 🌟 تمرير القيمة الديناميكية المحددة بدلاً من 50 الثابتة
+    onSearch({ keyword, maxResults: maxResults || 50, state, city });
   };
 
   const lastSearchedItem = [...availableKeywords]
@@ -265,7 +260,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </button>
           </div>
 
-          {/* قائمة الكلمات الطائرة تفتح للأعلى وتدعم الحذف الفوري وعداد رقمي لكل عنصر */}
+          {/* قائمة الكلمات الطائرة تفتح للأعلى وتدعم الحذف */}
           {showMiniList && (
             <div ref={miniListRef} className="absolute left-0 bottom-[54px] z-30 w-80 rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
               <div className="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/40 rounded-t-xl">
@@ -297,7 +292,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                           <span className="text-[10px] px-1.5 py-0.5 bg-slate-900 border border-slate-800 text-slate-500 rounded group-hover/item:border-slate-700 group-hover/item:text-slate-400 transition-colors uppercase">{k.status}</span>
                         )}
                         
-                        {/* زر الحذف x الصغير والأنيق جداً */}
                         <button
                           type="button"
                           onClick={(e) => handleDeleteKeyword(k.id, e)}
@@ -315,24 +309,41 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           )}
         </div>
 
-        {/* زر البحث الرئيسي */}
-        <button 
-          type="submit" 
-          disabled={isLoading || !state || !keyword} 
-          className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-xl shadow-blue-600/10 transition-all duration-200 hover:shadow-blue-600/20 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none cursor-pointer flex items-center justify-center gap-2"
-        >
-          {isLoading ? (
-            <>
-              <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <span>Searching Leads...</span>
-            </>
-          ) : (
-            <span>Search Leads</span>
-          )}
-        </button>
+        {/* 🌟 الصف السفلي المعدل: زر البحث مصفوف بجانب خانة الـ Max Results المطلوبة */}
+        <div className="flex items-center gap-3 w-full">
+          {/* حقل إدخال الحد الأقصى للنتائج */}
+          <div className="w-28 flex flex-col space-y-1.5 flex-shrink-0">
+            <input 
+              type="number"
+              min={1}
+              max={500}
+              value={maxResults}
+              onChange={(e) => setMaxResults(Number(e.target.value))}
+              placeholder="Max"
+              className="w-full h-[50px] text-center rounded-xl border border-slate-800 bg-slate-950/60 text-sm font-semibold text-slate-100 outline-none transition-all duration-200 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 placeholder-slate-600"
+              title="الحد الأقصى للنتائج المطلوب جلبها"
+            />
+          </div>
+
+          {/* زر البحث الرئيسي يأخذ باقي المساحة المتاحة بالتوافق الكامل */}
+          <button 
+            type="submit" 
+            disabled={isLoading || !state || !keyword} 
+            className="flex-1 h-[50px] rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-xl shadow-blue-600/10 transition-all duration-200 hover:shadow-blue-600/20 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none cursor-pointer flex items-center justify-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>Searching Leads...</span>
+              </>
+            ) : (
+              <span>Search Leads</span>
+            )}
+          </button>
+        </div>
       </form>
 
       {/* مودال إدخال الكلمات الجماعي */}
