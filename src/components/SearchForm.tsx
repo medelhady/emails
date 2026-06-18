@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SearchParams } from "@/types";
 import { usStates, CityInfo } from "@/data/usData";
 import { supabase } from "@/lib/supabase"; 
@@ -19,23 +19,35 @@ interface SearchFormProps {
 }
 
 export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
-  // الحقول الأساسية في مكانها السابق
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [keyword, setKeyword] = useState("");
-  const [maxResults, setMaxResults] = useState(50);
+  const [maxResults] = useState(50);
 
-  // القوائم وحالات التحميل
   const [availableCities, setAvailableCities] = useState<CityInfo[]>([]);
   const [availableKeywords, setAvailableKeywords] = useState<KeywordItem[]>([]);
   const [keywordsLoading, setKeywordsLoading] = useState(false);
 
-  // التحكم في البوب أب (Modal) وإضافة الكلمات
-  const [isOpenModal, setIsOpenModal] = useState(false);
-  const [newKeyword, setNewKeyword] = useState("");
-  const [isAddingKeyword, setIsAddingKeyword] = useState(false);
+  // التحكم في القوائم المنسدلة المخصصة والـ Popups
+  const [showMiniList, setShowMiniList] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkKeywordsText, setBulkKeywordsText] = useState("");
+  const [isSavingBulk, setIsSavingBulk] = useState(false);
 
-  // 1. تحديث قائمة المقاطعات فور تغيير الولاية
+  const miniListRef = useRef<HTMLDivElement>(null);
+
+  // إغلاق المنسدلة الصغيرة عند الضغط خارجها
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (miniListRef.current && !miniListRef.current.contains(event.target as Node)) {
+        setShowMiniList(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // تحديث قائمة المقاطعات
   useEffect(() => {
     if (!state) {
       setAvailableCities([]);
@@ -43,15 +55,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       return;
     }
     const selectedStateInfo = usStates.find(s => s.name === state || s.id === state);
-    if (selectedStateInfo) {
-      setAvailableCities(selectedStateInfo.cities);
-    } else {
-      setAvailableCities([]);
-    }
+    if (selectedStateInfo) setAvailableCities(selectedStateInfo.cities);
     setCity(""); 
   }, [state]);
 
-  // 2. جلب الكلمات المفتاحية من Supabase للولاية المحددة
+  // جلب الكلمات من سوبابيز
   const fetchKeywords = async (selectedState: string) => {
     if (!selectedState) {
       setAvailableKeywords([]);
@@ -68,7 +76,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       if (error) throw error;
       if (data) setAvailableKeywords(data as KeywordItem[]);
     } catch (err) {
-      console.error("Error fetching keywords:", err);
+      console.error(err);
     } finally {
       setKeywordsLoading(false);
     }
@@ -79,24 +87,39 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     setKeyword(""); 
   }, [state]);
 
-  // 3. إضافة كلمة جديدة من داخل البوب أب
-  const handleAddKeyword = async (e: React.FormEvent) => {
+  // معالجة إضافة الكلمات الجماعية (Bulk Insert)
+  const handleBulkAddKeywords = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!state || !newKeyword.trim()) return;
+    if (!state || !bulkKeywordsText.trim()) return;
 
-    setIsAddingKeyword(true);
+    setIsSavingBulk(true);
+    // تقسيم الكلمات بناءً على السطر الجديد وتصفية الفراغات
+    const keywordsArray = bulkKeywordsText
+      .split("\n")
+      .map(k => k.trim())
+      .filter(k => k.length > 0);
+
+    if (keywordsArray.length === 0) {
+      setIsSavingBulk(false);
+      return;
+    }
+
+    const rowsToInsert = keywordsArray.map(kw => ({
+      state_name: state,
+      keyword: kw,
+      status: 'ready'
+    }));
+
     try {
-      const { error } = await supabase
-        .from("state_keywords")
-        .insert([{ state_name: state, keyword: newKeyword.trim(), status: 'ready' }]);
-
+      const { error } = await supabase.from("state_keywords").insert(rowsToInsert);
       if (error) throw error;
       await fetchKeywords(state);
-      setNewKeyword("");
+      setBulkKeywordsText("");
+      setShowBulkModal(false);
     } catch (err) {
-      console.error("Error adding keyword:", err);
+      console.error("Error saving bulk keywords:", err);
     } finally {
-      setIsAddingKeyword(false);
+      setIsSavingBulk(false);
     }
   };
 
@@ -104,7 +127,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     e.preventDefault();
     if (!state || !keyword) return;
 
-    // العثور على الكلمة المحددة لتحديث حالتها إلى "جاري البحث" أونلاين
     const activeKw = availableKeywords.find(k => k.keyword === keyword);
     if (activeKw) {
       try {
@@ -112,40 +134,39 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           .from("state_keywords")
           .update({ status: 'searching', last_searched_at: new Date().toISOString() })
           .eq("id", activeKw.id);
-        
-        fetchKeywords(state); // تحديث القائمة لرؤية مؤشر الحالة المحدث فوراً
+        fetchKeywords(state);
       } catch (err) {
         console.error(err);
       }
     }
 
-    // إطلاق عملية البحث الأساسية
     onSearch({ keyword, maxResults, state, city });
 
-    // بعد انتهاء الفرز، تحويل الحالة إلى مكتملة
     if (activeKw) {
       setTimeout(async () => {
-        await supabase
-          .from("state_keywords")
-          .update({ status: 'completed' })
-          .eq("id", activeKw.id);
+        await supabase.from("state_keywords").update({ status: 'completed' }).eq("id", activeKw.id);
         fetchKeywords(state);
-      }, 3000);
+      }, 4000);
     }
   };
 
+  // تحديد آخر كلمة تم البحث عنها (التي تمتلك أحدث تاريخ بحث)
+  const lastSearchedItem = [...availableKeywords]
+    .filter(k => k.last_searched_at)
+    .sort((a, b) => new Date(b.last_searched_at!).getTime() - new Date(a.last_searched_at!).getTime())[0];
+
   return (
-    <div className="relative">
-      <form onSubmit={handleSubmit} className="space-y-4 p-4 rounded-xl border" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
+    <div className="relative w-full">
+      <form onSubmit={handleSubmit} className="space-y-4 p-4 rounded-xl border bg-card text-card-foreground" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* خانة اختيار الولاية */}
-          <div className="space-y-2 flex flex-col">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>الولاية (State)</label>
+          {/* حقل اختيار الولاية */}
+          <div className="space-y-1.5 flex flex-col">
+            <label className="text-xs font-semibold text-muted-foreground" style={{ color: "var(--color-text-muted)" }}>الولاية (State)</label>
             <select
               value={state}
               onChange={(e) => setState(e.target.value)}
-              className="rounded-lg border px-3 py-2 text-sm outline-none cursor-pointer focus:border-blue-500"
+              className="rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500 transition-all cursor-pointer"
               style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
             >
               <option value="">Select State...</option>
@@ -155,18 +176,18 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </select>
           </div>
 
-          {/* خانة اختيار المقاطعة */}
-          <div className="space-y-2 flex flex-col">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>المقاطعة (County / City)</label>
+          {/* حقل اختيار المقاطعة */}
+          <div className="space-y-1.5 flex flex-col">
+            <label className="text-xs font-semibold text-muted-foreground" style={{ color: "var(--color-text-muted)" }}>المقاطعة (County)</label>
             <select
               value={city}
               onChange={(e) => setCity(e.target.value)}
               disabled={!state || availableCities.length === 0}
-              className="rounded-lg border px-3 py-2 text-sm outline-none cursor-pointer focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:opacity-40 transition-all cursor-pointer"
               style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
             >
               <option value="">
-                {!state ? "Select a State first..." : "Select County (Ordered by Population)..."}
+                {!state ? "Select State first..." : "Select County..."}
               </option>
               {availableCities.map((c) => (
                 <option key={c.id} value={c.name}>{c.name}</option>
@@ -175,46 +196,77 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
         </div>
 
-        {/* خانة كلمة البحث في مكانها السابق مع زر البوب أب الذكي */}
-        <div className="space-y-2 flex flex-col">
-          <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>
-            كلمة البحث (Keyword / Business Type)
-          </label>
-          <div className="flex gap-2">
+        {/* حقل الكلمة المفتاحية المطور والأنيق جداً مع الأزرار المدمجة بالداخل */}
+        <div className="space-y-1.5 flex flex-col relative">
+          <label className="text-xs font-semibold text-muted-foreground" style={{ color: "var(--color-text-muted)" }}>كلمة البحث (Keyword)</label>
+          
+          <div className="relative flex items-center w-full">
             <select
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               disabled={!state || keywordsLoading || availableKeywords.length === 0}
-              className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none cursor-pointer focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-lg border pl-24 pr-3 py-2 text-sm outline-none focus:border-blue-500 disabled:opacity-40 transition-all cursor-pointer appearance-none"
               style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
             >
               <option value="">
-                {!state 
-                  ? "Select a State first..." 
-                  : keywordsLoading 
-                  ? "Loading keywords..." 
-                  : availableKeywords.length === 0 
-                  ? "No keywords found..." 
-                  : "Select a Keyword..."}
+                {!state ? "Select State first..." : keywordsLoading ? "Loading keywords..." : availableKeywords.length === 0 ? "No keywords..." : "Select a Keyword..."}
               </option>
               {availableKeywords.map((k) => (
-                <option key={k.id} value={k.keyword}>
-                  {k.keyword} {k.status === 'searching' ? '⏳' : k.status === 'completed' ? '✅' : '⚙️'}
-                </option>
+                <option key={k.id} value={k.keyword}>{k.keyword}</option>
               ))}
             </select>
 
-            {/* زر فتح البوب أب لإدارة الكلمات وتتبعها بمرونة */}
-            <button
-              type="button"
-              onClick={() => setIsOpenModal(true)}
-              disabled={!state}
-              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white rounded-lg text-xs font-medium transition-all cursor-pointer disabled:opacity-40"
-              title="إدارة وتتبع الكلمات بالترقيم"
-            >
-              📊 لوحة التحكم
-            </button>
+            {/* الأزرار المدمجة في يسار الحقل لمظهر احترافي وموفر للمساحة */}
+            <div className="absolute left-2 flex items-center gap-1">
+              {/* زر رؤية الكلمات وتتبع التوقف */}
+              <button
+                type="button"
+                disabled={!state || availableKeywords.length === 0}
+                onClick={() => setShowMiniList(!showMiniList)}
+                className="p-1 px-2 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-md text-xs font-mono transition-all disabled:opacity-30 cursor-pointer"
+                title="رؤية الكلمات بالترقيم وتتبع التوقف"
+              >
+                🗂️ القائمة
+              </button>
+
+              {/* سهم فتح بوب أب الإضافة الجماعية */}
+              <button
+                type="button"
+                disabled={!state}
+                onClick={() => setShowBulkModal(true)}
+                className="p-1 px-2 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/40 rounded-md text-xs font-bold transition-all disabled:opacity-30 cursor-pointer"
+                title="إضافة مجموعة كلمات جديدة"
+              >
+                ➕ سهم
+              </button>
+            </div>
           </div>
+
+          {/* 🗂️ القائمة المنسدلة المصغرة المرقّمة والمميزة بسهم التوقف */}
+          {showMiniList && (
+            <div ref={miniListRef} className="absolute left-0 top-[64px] z-30 w-72 rounded-xl border p-3 shadow-xl animate-in fade-in slide-in-from-top-2 duration-150" style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}>
+              <div className="text-[11px] font-bold pb-1.5 mb-1.5 border-b border-gray-700 text-gray-400 flex justify-between">
+                <span>الكلمات المرقّمة والتتبع:</span>
+                <span className="text-blue-400">➜ مؤشر التوقف الحالي</span>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                {availableKeywords.map((k, index) => {
+                  const isCurrentPointer = lastSearchedItem?.id === k.id;
+                  return (
+                    <div 
+                      key={k.id} 
+                      onClick={() => { setKeyword(k.keyword); setShowMiniList(false); }}
+                      className={`flex items-center justify-between p-1.5 px-2 rounded-md text-xs cursor-pointer transition-colors ${isCurrentPointer ? 'bg-blue-600/20 border border-blue-500/30 text-blue-300' : 'hover:bg-gray-800 text-gray-300'}`}
+                    >
+                      <span className="font-mono text-gray-500 text-[11px]">{index + 1}.</span>
+                      <span className="flex-1 mr-2 text-right font-medium truncate">{k.keyword}</span>
+                      {isCurrentPointer && <span className="text-blue-400 font-bold mr-1 text-[13px] animate-pulse">➜</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <button
@@ -226,93 +278,34 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         </button>
       </form>
 
-      {/* 📥 البوب أب المنبثق (Modal Overlay) لإدارة وتتبع الكلمات بالترقيم */}
-      {isOpenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-2xl border p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
-            
-            {/* الرأس */}
-            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--color-border)" }}>
+      {/* 📥 بوب أب الإضافة الجماعية المطور (Bulk Addition Modal) */}
+      {showBulkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl border p-5 space-y-4 shadow-2xl scale-in" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
+            <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: "var(--color-border)" }}>
               <div>
-                <h3 className="text-base font-bold text-white">📋 الكلمات المرقّمة لولاية {state}</h3>
-                <p className="text-xs text-gray-400">رؤية الكلمات الحالية، الترتيب بالرقم، ومعرفة أين وصلت عمليات البحث الأخيرة.</p>
+                <h3 className="text-sm font-bold text-white">➕ إضافة مجموعة كلمات مفتاحية دفعة واحدة</h3>
+                <p className="text-[11px] text-gray-400">سيتم حفظها وربطها تلقائياً بـ {state}</p>
               </div>
-              <button 
-                onClick={() => setIsOpenModal(false)}
-                className="text-gray-400 hover:text-white text-lg font-bold p-1"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowBulkModal(false)} className="text-gray-400 hover:text-white font-mono text-sm">✕</button>
             </div>
 
-            {/* نموذج إضافة كلمة جديدة داخل البوب أب */}
-            <form onSubmit={handleAddKeyword} className="flex gap-2 bg-gray-900/40 p-3 rounded-xl border border-dashed border-gray-700">
-              <input
-                type="text"
-                value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
-                placeholder="أدخل كلمة مفتاحية جديدة للرفع والتخزين..."
-                className="flex-1 rounded-lg border px-3 py-1.5 text-xs outline-none focus:border-blue-500 bg-gray-950 text-white border-gray-800"
-              />
-              <button 
-                type="submit" 
-                disabled={isAddingKeyword || !newKeyword.trim()} 
-                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-all"
-              >
-                {isAddingKeyword ? "جاري الحفظ..." : "إضافة وحفظ"}
-              </button>
-            </form>
+            <form onSubmit={handleBulkAddKeywords} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[11px] text-gray-400">أدخل الكلمات (كلمة واحدة في كل سطر):</label>
+                <textarea
+                  value={bulkKeywordsText}
+                  onChange={(e) => setBulkKeywordsText(e.target.value)}
+                  rows={6}
+                  required
+                  placeholder="Property Management&#10;Real Estate Broker&#10;Apartment Rentals&#10;Commercial Leasing"
+                  className="w-full rounded-lg border p-3 text-xs outline-none bg-gray-950 text-white border-gray-800 focus:border-blue-500 resize-none font-mono placeholder:text-gray-600"
+                />
+              </div>
 
-            {/* الجدول التتبعي المرقّم */}
-            <div className="overflow-y-auto max-h-64 rounded-lg border border-gray-800">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-gray-900 text-gray-300 border-b border-gray-800">
-                    <th className="py-2 px-3 text-right w-12">#</th>
-                    <th className="py-2 px-3">الكلمة المفتاحية (Keyword)</th>
-                    <th className="py-2 px-3 text-center">حالة المؤشر</th>
-                    <th className="py-2 px-3 text-center">آخر توقيت بحث</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {availableKeywords.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-6 text-center text-gray-500">لا توجد كلمات حالية للولاية، أضف أول كلمة بالنموذج العلوي!</td>
-                    </tr>
-                  ) : (
-                    availableKeywords.map((k, index) => (
-                      <tr key={k.id} className={`hover:bg-gray-800/40 transition-colors ${k.status === 'searching' ? 'bg-amber-950/30' : ''}`}>
-                        <td className="py-2 px-3 text-right font-mono text-gray-500">{index + 1}</td>
-                        <td className="py-2 px-3 font-medium text-gray-200">{k.keyword}</td>
-                        <td className="py-2 px-3 text-center">
-                          {k.status === 'ready' && <span className="px-2 py-0.5 rounded bg-gray-800 text-gray-400 text-[10px]">جاهزة 🟢</span>}
-                          {k.status === 'searching' && <span className="px-2 py-0.5 rounded bg-amber-600 text-white text-[10px] animate-pulse">جاري البحث 🟡</span>}
-                          {k.status === 'completed' && <span className="px-2 py-0.5 rounded bg-blue-900 text-blue-200 text-[10px]">مكتملة ومؤرشفة 🔵</span>}
-                        </td>
-                        <td className="py-2 px-3 text-center font-mono text-gray-400">
-                          {k.last_searched_at ? new Date(k.last_searched_at).toLocaleTimeString() : "لم تبحث بعد"}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* الإغلاق */}
-            <div className="flex justify-end pt-2 border-t border-gray-800">
-              <button
-                type="button"
-                onClick={() => setIsOpenModal(false)}
-                className="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-medium transition-all"
-              >
-                إغلاق الواجهة
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+              <div className="flex justify-end gap-2 text-xs pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkModal(false)}
+                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-all"
+                >
