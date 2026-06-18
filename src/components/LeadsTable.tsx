@@ -9,83 +9,62 @@ interface LeadsTableProps {
 
 export function LeadsTable({ leads }: LeadsTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [copyFrom, setCopyFrom] = useState<string>("1");
-  const [copyTo, setCopyTo] = useState<string>("");
-  const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [copyFrom, setCopyFrom] = useState("1");
+  const [copyTo, setCopyTo] = useState("");
+  const [copiedFeedback, setCopiedFeedback] = useState(false);
 
-  // فلترة الليدز بناءً على البحث
-  const filteredLeads = leads.filter(
-    (lead) =>
-      (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (lead.website && lead.website.toLowerCase().includes(searchTerm.toLowerCase()))
+  // الفلترة بناءً على حقل البحث
+  const filteredLeads = leads.filter(lead => 
+    lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    lead.website?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // نسخ عمود كامل
-  const handleCopyColumn = (type: "email" | "website") => {
-    const list = filteredLeads
-      .map((lead) => (type === "email" ? lead.email : lead.website))
-      .filter((val) => val && val.trim() !== "");
-
-    if (list.length === 0) return;
-
-    navigator.clipboard.writeText(list.join("\n"));
-    triggerCopyFeedback(type === "email" ? "جميع الإيميلات" : "جميع المواقع");
-  };
-
-  // نسخ نطاق محدد من X إلى Y
-  const handleCopyRange = (type: "email" | "website") => {
+  // دالة نسخ النطاق الصحيحة
+  const handleCopyRange = () => {
     const fromIndex = parseInt(copyFrom) - 1;
     const toIndex = parseInt(copyTo || filteredLeads.length.toString()) - 1;
 
     if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex < 0 || toIndex >= filteredLeads.length || fromIndex > toIndex) {
-      alert("الرجاء إدخال نطاق صفوف صحيح ومتاح في الجدول!");
+      alert("الرجاء تحديد نطاق صحيح متاح داخل الجدول!");
       return;
     }
 
-    const rangeLeads = filteredLeads.slice(fromIndex, toIndex + 1);
-    const list = rangeLeads
-      .map((lead) => (type === "email" ? lead.email : lead.website))
-      .filter((val) => val && val.trim() !== "");
+    const rangeItems = filteredLeads.slice(fromIndex, toIndex + 1);
+    const emailsList = rangeItems.map(l => l.email).filter(Boolean).join("\n");
 
-    if (list.length === 0) return;
+    if (!emailsList) {
+      alert("لا توجد إيميلات صالحة للنسخ في هذا النطاق!");
+      return;
+    }
 
-    navigator.clipboard.writeText(list.join("\n"));
-    triggerCopyFeedback(`النطاق من ${copyFrom} إلى ${toIndex + 1}`);
-  };
-
-  const triggerCopyFeedback = (message: string) => {
-    setCopiedType(message);
-    setTimeout(() => setCopiedType(null), 2500);
+    navigator.clipboard.writeText(emailsList);
+    setCopiedFeedback(true);
+    setTimeout(() => setCopiedFeedback(false), 2000);
   };
 
   return (
-    <div className="w-full rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-2xl space-y-4 text-slate-200">
+    <div className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-6 space-y-4 shadow-xl">
       
-      {/* البار العلوي النظيف والمستقر */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-4">
+      {/* شريط التحكم العلوي فوق الجدول */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-900 pb-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-white tracking-wide">
-            Leads — {filteredLeads.length}
-          </h2>
-          {copiedType && (
-            <span className="text-[11px] bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-              ✓ تم نسخ {copiedType} بنجاح!
-            </span>
+          <h2 className="text-base font-bold text-white">Leads — {filteredLeads.length}</h2>
+          {copiedFeedback && (
+            <span className="text-[11px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">✓ تم نسخ النطاق</span>
           )}
         </div>
 
-        {/* شريط أدوات النسخ والبحث مدمج تلقائياً بشكل فلات ونظيف */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* أدوات الفلترة والنسخ المتقدمة */}
+        <div className="flex flex-wrap items-center gap-3 justify-end">
           
-          {/* أدوات النسخ من X إلى Y */}
-          <div className="flex items-center gap-1.5 bg-slate-950/60 border border-slate-800 px-2.5 py-1.5 rounded-xl text-xs">
+          {/* شريط نسخ النطاق المخصص المستقر */}
+          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
             <span className="text-slate-400">نسخ من</span>
             <input 
               type="number" 
-              placeholder="1" 
               value={copyFrom}
               onChange={(e) => setCopyFrom(e.target.value)}
-              className="w-12 h-7 text-center bg-slate-900 border border-slate-800 rounded-md outline-none text-white focus:border-blue-500"
+              className="w-12 h-7 text-center bg-slate-950 border border-slate-800 rounded-lg outline-none text-white focus:border-blue-500 font-mono"
             />
             <span className="text-slate-400">إلى</span>
             <input 
@@ -93,113 +72,61 @@ export function LeadsTable({ leads }: LeadsTableProps) {
               placeholder={filteredLeads.length.toString()} 
               value={copyTo}
               onChange={(e) => setCopyTo(e.target.value)}
-              className="w-12 h-7 text-center bg-slate-900 border border-slate-800 rounded-md outline-none text-white focus:border-blue-500"
+              className="w-12 h-7 text-center bg-slate-950 border border-slate-800 rounded-lg outline-none text-white focus:border-blue-500 font-mono"
             />
-            <div className="flex gap-1 mr-1">
-              <button
-                type="button"
-                onClick={() => handleCopyRange("email")}
-                disabled={filteredLeads.length === 0}
-                className="px-2 py-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/20 rounded cursor-pointer transition-colors"
-              >
-                📧 إيميل
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCopyRange("website")}
-                disabled={filteredLeads.length === 0}
-                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded cursor-pointer transition-colors"
-              >
-                🌐 موقع
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleCopyRange}
+              disabled={filteredLeads.length === 0}
+              className="mr-2 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium cursor-pointer"
+            >
+              نسخ الإيميلات
+            </button>
           </div>
 
-          {/* خانة البحث السريع */}
+          {/* صندوق البحث الداخلي */}
           <input
             type="text"
-            placeholder="بحث..."
+            placeholder="بحث داخل النتائج..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-48 bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-100 outline-none transition-all focus:border-blue-500"
+            className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-200 outline-none focus:border-blue-500 w-48 text-right"
           />
         </div>
       </div>
 
-      {/* الجدول الرئيسي للبيانات مع الترقيم التلقائي المحسن */}
-      <div className="overflow-x-auto rounded-xl border border-slate-800/60 custom-scrollbar">
-        <table className="w-full text-left border-collapse">
+      {/* جدول عرض البيانات */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="bg-slate-950/40 border-b border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400">
-              <th className="py-3.5 px-4 w-14 text-center border-r border-slate-800/40">#</th>
-              <th className="py-3.5 px-5 group/th">
-                <div className="flex items-center justify-between">
-                  <span>العنوان البريدي (Email)</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyColumn("email")}
-                    className="opacity-0 group-hover/th:opacity-100 p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all text-[10px] cursor-pointer"
-                  >
-                    📋 نسخ الكل
-                  </button>
-                </div>
-              </th>
-              <th className="py-3.5 px-5 group/th">
-                <div className="flex items-center justify-between">
-                  <span>الموقع الإلكتروني (Website)</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyColumn("website")}
-                    className="opacity-0 group-hover/th:opacity-100 p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all text-[10px] cursor-pointer"
-                  >
-                    📋 نسخ الكل
-                  </button>
-                </div>
-              </th>
+            <tr className="border-b border-slate-900 text-slate-400 font-bold uppercase">
+              <th className="py-3 px-4 w-12 text-center">#</th>
+              <th className="py-3 px-4 text-right">الإيميل</th>
+              <th className="py-3 px-4 text-left">الموقع</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
+          <tbody className="divide-y divide-slate-900/60 text-slate-300">
             {filteredLeads.map((lead, index) => (
-              <tr key={index} className="hover:bg-slate-900/30 transition-colors">
-                {/* الترقيم التسلسلي التلقائي النظيف */}
-                <td className="py-3 px-4 text-center font-mono text-slate-500 bg-slate-950/20 border-r border-slate-800/40">
-                  {(index + 1).toString().padStart(2, '0')}
-                </td>
-                <td className="py-3 px-5 font-mono text-slate-200">
-                  {lead.email ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400">✉</span>
-                      <span className="select-all">{lead.email}</span>
-                    </div>
-                  ) : (
-                    <span className="text-slate-600">—</span>
-                  )}
-                </td>
-                <td className="py-3 px-5 text-blue-400 font-mono">
+              <tr key={lead.id || index} className="hover:bg-slate-900/30 transition-colors">
+                <td className="py-3.5 px-4 text-center font-mono text-slate-600">{(index + 1).toString().padStart(2, '0')}</td>
+                <td className="py-3.5 px-4 text-right font-mono text-blue-400">{lead.email || "—"}</td>
+                <td className="py-3.5 px-4 text-left truncate max-w-xs text-slate-400">
                   {lead.website ? (
-                    <a
-                      href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline flex items-center gap-1 max-w-xs truncate"
-                    >
-                      <span>↗</span>
-                      <span className="select-all">{lead.website}</span>
+                    <a href={lead.website} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
+                      🔗 {lead.website}
                     </a>
-                  ) : (
-                    <span className="text-slate-600">—</span>
-                  )}
+                  ) : "—"}
                 </td>
               </tr>
             ))}
 
             {filteredLeads.length === 0 && (
               <tr>
-                <td colSpan={3} className="py-8 text-center text-slate-500 text-xs">
+                <td colSpan={3} className="py-10 text-center text-slate-600">
                   لا توجد ليدز متاحة حالياً للعرض أو البحث المكتوب...
                 </td>
               </tr>
-            )}
+            ))}
           </tbody>
         </table>
       </div>
