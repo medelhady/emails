@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lead } from "@/types"; // تأكد من مطابقة مسار الـ Types في مشروعك
+import { Lead } from "@/types";
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -9,18 +9,18 @@ interface LeadsTableProps {
 
 export function LeadsTable({ leads }: LeadsTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [copyFrom, setCopyFrom] = useState<string>("");
+  const [copyFrom, setCopyFrom] = useState<string>("1");
   const [copyTo, setCopyTo] = useState<string>("");
   const [copiedType, setCopiedType] = useState<string | null>(null);
 
-  // فلترة الليدز بناءً على حقل البحث العلوي
+  // فلترة الليدز بناءً على البحث
   const filteredLeads = leads.filter(
     (lead) =>
       (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (lead.website && lead.website.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // وظيفة نسخ عمود بالكامل (فقط العناصر المفلترة والموجودة حالياً)
+  // نسخ عمود كامل
   const handleCopyColumn = (type: "email" | "website") => {
     const list = filteredLeads
       .map((lead) => (type === "email" ? lead.email : lead.website))
@@ -32,10 +32,10 @@ export function LeadsTable({ leads }: LeadsTableProps) {
     triggerCopyFeedback(type === "email" ? "جميع الإيميلات" : "جميع المواقع");
   };
 
-  // وظيفة نسخ نطاق مخصص من X إلى Y
+  // نسخ نطاق محدد من X إلى Y
   const handleCopyRange = (type: "email" | "website") => {
     const fromIndex = parseInt(copyFrom) - 1;
-    const toIndex = parseInt(copyTo) - 1;
+    const toIndex = parseInt(copyTo || filteredLeads.length.toString()) - 1;
 
     if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex < 0 || toIndex >= filteredLeads.length || fromIndex > toIndex) {
       alert("الرجاء إدخال نطاق صفوف صحيح ومتاح في الجدول!");
@@ -50,7 +50,7 @@ export function LeadsTable({ leads }: LeadsTableProps) {
     if (list.length === 0) return;
 
     navigator.clipboard.writeText(list.join("\n"));
-    triggerCopyFeedback(`النطاق من ${copyFrom} إلى ${copyTo}`);
+    triggerCopyFeedback(`النطاق من ${copyFrom} إلى ${toIndex + 1}`);
   };
 
   const triggerCopyFeedback = (message: string) => {
@@ -61,21 +61,23 @@ export function LeadsTable({ leads }: LeadsTableProps) {
   return (
     <div className="w-full rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-2xl space-y-4 text-slate-200">
       
-      {/* البار العلوي: الإحصائيات، البحث، وأدوات النسخ المتقدم من X إلى Y */}
+      {/* البار العلوي النظيف والمستقر */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-white tracking-wide">Leads — {filteredLeads.length}</h2>
+          <h2 className="text-lg font-bold text-white tracking-wide">
+            Leads — {filteredLeads.length}
+          </h2>
           {copiedType && (
-            <span className="text-[11px] bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/20 animate-pulse">
+            <span className="text-[11px] bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/20">
               ✓ تم نسخ {copiedType} بنجاح!
             </span>
           )}
         </div>
 
-        {/* أدوات النسخ الذكي من X إلى Y والفلترة */}
+        {/* شريط أدوات النسخ والبحث مدمج تلقائياً بشكل فلات ونظيف */}
         <div className="flex flex-wrap items-center gap-3">
           
-          {/* قسم النسخ المخصص */}
+          {/* أدوات النسخ من X إلى Y */}
           <div className="flex items-center gap-1.5 bg-slate-950/60 border border-slate-800 px-2.5 py-1.5 rounded-xl text-xs">
             <span className="text-slate-400">نسخ من</span>
             <input 
@@ -95,28 +97,28 @@ export function LeadsTable({ leads }: LeadsTableProps) {
             />
             <div className="flex gap-1 mr-1">
               <button
+                type="button"
                 onClick={() => handleCopyRange("email")}
                 disabled={filteredLeads.length === 0}
                 className="px-2 py-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/20 rounded cursor-pointer transition-colors"
-                title="نسخ نطاق الإيميلات المحدد"
               >
                 📧 إيميل
               </button>
               <button
+                type="button"
                 onClick={() => handleCopyRange("website")}
                 disabled={filteredLeads.length === 0}
                 className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded cursor-pointer transition-colors"
-                title="نسخ نطاق المواقع المحدد"
               >
                 🌐 موقع
               </button>
             </div>
           </div>
 
-          {/* خانة البحث */}
+          {/* خانة البحث السريع */}
           <input
             type="text"
-            placeholder="..."
+            placeholder="بحث..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-48 bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-100 outline-none transition-all focus:border-blue-500"
@@ -124,38 +126,31 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         </div>
       </div>
 
-      {/* جدول البيانات */}
+      {/* الجدول الرئيسي للبيانات مع الترقيم التلقائي المحسن */}
       <div className="overflow-x-auto rounded-xl border border-slate-800/60 custom-scrollbar">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-950/40 border-b border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400">
-              {/* عمود الترقيم */}
               <th className="py-3.5 px-4 w-14 text-center border-r border-slate-800/40">#</th>
-              
-              {/* عمود الإيميل مع خيار نسخ العمود كاملاً */}
               <th className="py-3.5 px-5 group/th">
                 <div className="flex items-center justify-between">
-                  <span>الإيميل</span>
+                  <span>العنوان البريدي (Email)</span>
                   <button
                     type="button"
                     onClick={() => handleCopyColumn("email")}
-                    className="opacity-0 group-hover/th:opacity-100 p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all text-[10px] flex items-center gap-1 cursor-pointer"
-                    title="نسخ العمود كاملاً"
+                    className="opacity-0 group-hover/th:opacity-100 p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all text-[10px] cursor-pointer"
                   >
                     📋 نسخ الكل
                   </button>
                 </div>
               </th>
-
-              {/* عمود الموقع مع خيار نسخ العمود كاملاً */}
               <th className="py-3.5 px-5 group/th">
                 <div className="flex items-center justify-between">
-                  <span>الموقع</span>
+                  <span>الموقع الإلكتروني (Website)</span>
                   <button
                     type="button"
                     onClick={() => handleCopyColumn("website")}
-                    className="opacity-0 group-hover/th:opacity-100 p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all text-[10px] flex items-center gap-1 cursor-pointer"
-                    title="نسخ العمود كاملاً"
+                    className="opacity-0 group-hover/th:opacity-100 p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all text-[10px] cursor-pointer"
                   >
                     📋 نسخ الكل
                   </button>
@@ -166,25 +161,20 @@ export function LeadsTable({ leads }: LeadsTableProps) {
           <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
             {filteredLeads.map((lead, index) => (
               <tr key={index} className="hover:bg-slate-900/30 transition-colors">
-                
-                {/* رقم الصف التلقائي */}
+                {/* الترقيم التسلسلي التلقائي النظيف */}
                 <td className="py-3 px-4 text-center font-mono text-slate-500 bg-slate-950/20 border-r border-slate-800/40">
                   {(index + 1).toString().padStart(2, '0')}
                 </td>
-
-                {/* قيمة الإيميل */}
                 <td className="py-3 px-5 font-mono text-slate-200">
                   {lead.email ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400 text-xs">✉</span>
+                      <span className="text-slate-400">✉</span>
                       <span className="select-all">{lead.email}</span>
                     </div>
                   ) : (
                     <span className="text-slate-600">—</span>
                   )}
                 </td>
-
-                {/* قيمة الموقع */}
                 <td className="py-3 px-5 text-blue-400 font-mono">
                   {lead.website ? (
                     <a

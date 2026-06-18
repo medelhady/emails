@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { SearchParams } from "@/types";
 import { usStates, CityInfo } from "@/data/usData";
-import { supabase } from "@/lib/supabase"; 
+import { supabase } from "@/lib/supabase";
 
 interface KeywordItem {
   id: number;
@@ -22,29 +22,29 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [keyword, setKeyword] = useState("");
-  const [maxResults, setMaxResults] = useState<number>(50); // 🌟 إشراك متغير حالة لعدد النتائج المطلوبة
 
   const [availableCities, setAvailableCities] = useState<CityInfo[]>([]);
   const [availableKeywords, setAvailableKeywords] = useState<KeywordItem[]>([]);
   const [keywordsLoading, setKeywordsLoading] = useState(false);
 
-  const [showMiniList, setShowMiniList] = useState(false);
+  // التحكم في القائمة المنبثقة العلوية (تتبع الكلمات الجاهزة)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [dropdownSearch, setDropdownSearch] = useState("");
+  const [copyFrom, setCopyFrom] = useState<string>("1");
+  const [copyTo, setCopyTo] = useState<string>("");
+  const [copiedFeedback, setCopiedFeedback] = useState(false);
+
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkKeywordsText, setBulkKeywordsText] = useState("");
   const [isSavingBulk, setIsSavingBulk] = useState(false);
 
-  const miniListRef = useRef<HTMLDivElement>(null);
-  const buttonListRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // إغلاق القائمة عند الضغط خارجها
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        miniListRef.current && 
-        !miniListRef.current.contains(event.target as Node) &&
-        buttonListRef.current &&
-        !buttonListRef.current.contains(event.target as Node)
-      ) {
-        setShowMiniList(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -59,7 +59,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     }
     const res = usStates.find(s => s.name === state || s.id === state);
     if (res) setAvailableCities(res.cities);
-    setCity(""); 
+    setCity("");
   }, [state]);
 
   const fetchKeywords = async (selectedState: string) => {
@@ -85,26 +85,32 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
   useEffect(() => {
     fetchKeywords(state);
-    setKeyword(""); 
+    setKeyword("");
   }, [state]);
 
-  const handleDeleteKeyword = async (id: number, e: React.MouseEvent) => {
-    e.stopPropagation(); 
-    try {
-      const { error } = await supabase
-        .from("state_keywords")
-        .delete()
-        .eq("id", id);
-      
-      if (error) throw error;
-      
-      setAvailableKeywords(prev => prev.filter(k => k.id !== id));
-      if (keyword && availableKeywords.find(k => k.id === id)?.keyword === keyword) {
-        setKeyword("");
-      }
-    } catch (err) {
-      console.error("Error deleting keyword:", err);
+  // فلترة الكلمات داخل القائمة المنبثقة بناءً على البحث المدمج في الأعلى
+  const filteredKeywords = availableKeywords.filter((k) =>
+    k.keyword.toLowerCase().includes(dropdownSearch.toLowerCase())
+  );
+
+  // وظيفة نسخ النطاق المخصص من الكلمات المفتاحية/الأميلات الجاهزة من X إلى Y
+  const handleCopyRange = () => {
+    const fromIndex = parseInt(copyFrom) - 1;
+    const toIndex = parseInt(copyTo || filteredKeywords.length.toString()) - 1;
+
+    if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex < 0 || toIndex >= filteredKeywords.length || fromIndex > toIndex) {
+      alert("الرجاء إدخال نطاق صحيح ومتاح في القائمة!");
+      return;
     }
+
+    const rangeItems = filteredKeywords.slice(fromIndex, toIndex + 1);
+    const listText = rangeItems.map((k) => k.keyword).join("\n");
+
+    if (!listText) return;
+
+    navigator.clipboard.writeText(listText);
+    setCopiedFeedback(true);
+    setTimeout(() => setCopiedFeedback(false), 2000);
   };
 
   const handleBulkAddKeywords = async (e: React.FormEvent) => {
@@ -112,43 +118,15 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     if (!state || !bulkKeywordsText.trim()) return;
 
     setIsSavingBulk(true);
-    
-    const inputKeywords = bulkKeywordsText
-      .split("\n")
-      .map(k => k.trim())
-      .filter(k => k.length > 0);
+    const arr = bulkKeywordsText.split("\n").map(k => k.trim()).filter(k => k.length > 0);
 
-    if (inputKeywords.length === 0) {
+    if (arr.length === 0) {
       setIsSavingBulk(false);
       return;
     }
 
     try {
-      const { data: existingData } = await supabase
-        .from("state_keywords")
-        .select("keyword")
-        .eq("state_name", state);
-
-      const existingKeywordsSet = new Set(
-        existingData ? existingData.map(d => d.keyword.toLowerCase()) : []
-      );
-
-      const uniqueNewKeywords = Array.from(new Set(inputKeywords))
-        .filter(kw => !existingKeywordsSet.has(kw.toLowerCase()));
-
-      if (uniqueNewKeywords.length === 0) {
-        alert("جميع الكلمات المدخلة موجودة بالفعل لهذه الولاية!");
-        setIsSavingBulk(false);
-        setShowBulkModal(false);
-        return;
-      }
-
-      const rows = uniqueNewKeywords.map(kw => ({
-        state_name: state,
-        keyword: kw,
-        status: 'ready'
-      }));
-      
+      const rows = arr.map(kw => ({ state_name: state, keyword: kw, status: 'ready' }));
       const { error } = await supabase.from("state_keywords").insert(rows);
       if (error) throw error;
       
@@ -177,223 +155,175 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         console.error(err);
       }
     }
-    // 🌟 تمرير القيمة الديناميكية المحددة بدلاً من 50 الثابتة
-    onSearch({ keyword, maxResults: maxResults || 50, state, city });
+    onSearch({ keyword, maxResults: 50, state, city });
   };
-
-  const lastSearchedItem = [...availableKeywords]
-    .filter(k => k.last_searched_at)
-    .sort((a, b) => new Date(b.last_searched_at!).getTime() - new Date(a.last_searched_at!).getTime())[0];
 
   return (
     <div className="relative w-full text-slate-200">
-      <form onSubmit={handleSubmit} className="space-y-5 p-6 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl backdrop-blur-md">
+      <form onSubmit={handleSubmit} className="space-y-5 p-7 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl">
         
         {/* صف اختيار الولاية والمقاطعة */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="space-y-2 flex flex-col">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">الولاية (State)</label>
-            <select 
-              value={state} 
-              onChange={(e) => setState(e.target.value)} 
-              className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition-all duration-200 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 cursor-pointer"
-            >
-              <option value="" className="bg-slate-950">Select State...</option>
-              {usStates.map((s) => <option key={s.id} value={s.name} className="bg-slate-950">{s.name}</option>)}
+          <div className="space-y-2.5 flex flex-col">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">الولاية (STATE)</label>
+            <select value={state} onChange={(e) => setState(e.target.value)} className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3.5 text-sm text-slate-100 outline-none transition-all focus:border-blue-500 cursor-pointer">
+              <option value="">Select State...</option>
+              {usStates.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
           </div>
 
-          <div className="space-y-2 flex flex-col">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">المقاطعة (County)</label>
-            <select 
-              value={city} 
-              onChange={(e) => setCity(e.target.value)} 
-              disabled={!state || availableCities.length === 0} 
-              className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition-all duration-200 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <option value="" className="bg-slate-950">{!state ? "Select State first..." : "Select County..."}</option>
-              {availableCities.map((c) => <option key={c.id} value={c.name} className="bg-slate-950">{c.name}</option>)}
+          <div className="space-y-2.5 flex flex-col">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">المقاطعة (COUNTY)</label>
+            <select value={city} onChange={(e) => setCity(e.target.value)} disabled={!state || availableCities.length === 0} className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3.5 text-sm text-slate-100 outline-none transition-all focus:border-blue-500 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+              <option value="">{!state ? "Select State first..." : "Select County..."}</option>
+              {availableCities.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
         </div>
 
-        {/* حقل الكلمات المفتاحية */}
-        <div className="space-y-2 flex flex-col relative">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            كلمة البحث (Keyword) {availableKeywords.length > 0 && `(${availableKeywords.length})`}
-          </label>
-          
+        {/* حقل الكلمة المفتاحية وربطه بالقائمة المنبثقة الطائرة المدمجة */}
+        <div className="space-y-2.5 flex flex-col relative" ref={dropdownRef}>
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-400">كلمة البحث أو النطاق (KEYWORD / DOMAIN)</label>
           <div className="flex items-center gap-2 w-full">
-            <div className="relative flex-1">
-              <select 
-                value={keyword} 
-                onChange={(e) => setKeyword(e.target.value)} 
-                disabled={!state || keywordsLoading || availableKeywords.length === 0} 
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition-all duration-200 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <option value="" className="bg-slate-950">
-                  {!state ? "Select State first..." : keywordsLoading ? "Loading keywords..." : availableKeywords.length === 0 ? "No keywords available..." : `Select a Keyword... (${availableKeywords.length})`}
-                </option>
-                {availableKeywords.map((k) => <option key={k.id} value={k.keyword} className="bg-slate-950">{k.keyword}</option>)}
-              </select>
-            </div>
-
-            <button 
-              ref={buttonListRef} 
-              type="button" 
-              disabled={!state || availableKeywords.length === 0} 
-              onClick={() => setShowMiniList(!showMiniList)} 
-              className="flex items-center gap-1.5 h-[46px] px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer whitespace-nowrap shadow-md"
-              title="عرض القائمة"
-            >
-              🗂️ <span>القائمة ({availableKeywords.length})</span>
-            </button>
             
+            {/* زر القائمة المنسدلة النظيف والمطابق لتصميم لوحة تحكمك */}
+            <button
+              type="button"
+              disabled={!state || keywordsLoading}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center gap-2 px-4 py-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-sm font-medium text-slate-200 transition-all cursor-pointer shadow-lg disabled:opacity-50"
+            >
+              <span>📁</span>
+              <span>القائمة</span>
+              <span className="bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded-md text-xs font-mono text-blue-400 font-bold">
+                {availableKeywords.length}
+              </span>
+            </button>
+
+            {/* زر الإضافة السريعة مدمج بجانبه */}
             <button 
               type="button" 
               disabled={!state} 
               onClick={() => setShowBulkModal(true)} 
-              className="flex items-center justify-center w-12 h-[46px] bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xl font-bold shadow-lg shadow-blue-600/20 transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-              title="إضافة كلمات"
+              className="flex items-center justify-center w-12 h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-lg font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg"
+              title="إضافة كلمات مجمعة"
             >
               +
             </button>
+
+            {/* حقل العرض الحالي النصي للكلمة المختارة */}
+            <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3.5 text-sm text-slate-400 truncate">
+              {keyword || "Select a Keyword from the list..."}
+            </div>
           </div>
 
-          {/* قائمة الكلمات الطائرة تفتح للأعلى وتدعم الحذف */}
-          {showMiniList && (
-            <div ref={miniListRef} className="absolute left-0 bottom-[54px] z-30 w-80 rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <div className="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/40 rounded-t-xl">
-                <span className="text-xs font-bold text-slate-400">تتبع الكلمات الجاهزة ({availableKeywords.length})</span>
-                <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20 font-medium">➜ النشط حالياً</span>
-              </div>
-              <div className="max-h-56 overflow-y-auto p-2 space-y-0.5 custom-scrollbar">
-                {availableKeywords.map((k, index) => {
-                  const isCurrent = lastSearchedItem?.id === k.id;
-                  return (
-                    <div 
-                      key={k.id} 
-                      onClick={() => { setKeyword(k.keyword); setShowMiniList(false); }} 
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs cursor-pointer transition-all duration-150 group/item ${
-                        isCurrent 
-                          ? 'bg-blue-600/10 text-blue-400 font-semibold border border-blue-500/20' 
-                          : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-                      }`}
+          {/* 🌟 القائمة المنبثقة الطائرة العلوية الاحترافية والذكية مدمج بها أدوات النسخ والبحث السريع والترقيم التلقائي */}
+          {isDropdownOpen && (
+            <div className="absolute right-0 top-[85px] z-50 w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl p-4 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-150 text-right">
+              
+              {/* بار التحكم العلوي داخل القائمة: العنوان، البحث، وأدوات نطاق النسخ من X إلى Y */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400">تتبع الكلمات الجاهزة</span>
+                  {copiedFeedback && (
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">✓ تم النسخ</span>
+                  )}
+                </div>
+
+                {/* أدوات التحكم المدمجة: نسخ من وإلى والبحث الداخلي */}
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  
+                  {/* شريط أدوات النسخ من X إلى Y مدمج بأناقة */}
+                  <div className="flex items-center gap-1 bg-slate-900/80 border border-slate-800 px-2 py-1 rounded-lg text-[11px]">
+                    <span className="text-slate-500">نسخ من</span>
+                    <input 
+                      type="number" 
+                      value={copyFrom}
+                      onChange={(e) => setCopyFrom(e.target.value)}
+                      className="w-10 h-6 text-center bg-slate-950 border border-slate-800 rounded outline-none text-white focus:border-blue-500 text-xs font-mono"
+                    />
+                    <span className="text-slate-500">إلى</span>
+                    <input 
+                      type="number" 
+                      placeholder={filteredKeywords.length.toString()} 
+                      value={copyTo}
+                      onChange={(e) => setCopyTo(e.target.value)}
+                      className="w-10 h-6 text-center bg-slate-950 border border-slate-800 rounded outline-none text-white focus:border-blue-500 text-xs font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyRange}
+                      disabled={filteredKeywords.length === 0}
+                      className="mr-1.5 px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-medium transition-colors cursor-pointer"
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-[10px] font-mono text-slate-500 group-hover/item:text-slate-400 flex-shrink-0">{(index + 1).toString().padStart(2, '0')}</span>
-                        <span className="truncate pr-2">{k.keyword}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {isCurrent ? (
-                          <span className="text-blue-400 text-[10px]">➜</span>
-                        ) : (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-900 border border-slate-800 text-slate-500 rounded group-hover/item:border-slate-700 group-hover/item:text-slate-400 transition-colors uppercase">{k.status}</span>
-                        )}
-                        
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteKeyword(k.id, e)}
-                          className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all duration-150 text-[11px]"
-                          title="حذف الكلمة"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                      نسخ النطاق
+                    </button>
+                  </div>
+
+                  {/* حقل البحث السريع التابع للمنبثقة */}
+                  <input
+                    type="text"
+                    placeholder="بحث سريع..."
+                    value={dropdownSearch}
+                    onChange={(e) => setDropdownSearch(e.target.value)}
+                    className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 outline-none focus:border-blue-500 w-28"
+                  />
+                </div>
               </div>
+
+              {/* قائمة العناصر والكلمات المجلوبة مع الترقيم التسلسلي الزوجي والتفاعلي */}
+              <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                {filteredKeywords.map((k, index) => (
+                  <div
+                    key={k.id}
+                    onClick={() => {
+                      setKeyword(k.keyword);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors group ${
+                      keyword === k.keyword 
+                        ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' 
+                        : 'text-slate-300 hover:bg-slate-900/50 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* الترقيم التسلسلي الاحترافي */}
+                      <span className="font-mono text-[11px] text-slate-600 group-hover:text-slate-400">
+                        {(index + 1).toString().padStart(2, '0')}
+                      </span>
+                      <span className="font-mono truncate max-w-xs">{k.keyword}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-slate-400">
+                        {k.status}
+                      </span>
+                      {keyword === k.keyword && <span className="text-blue-400">✓</span>}
+                    </div>
+                  </div>
+                ))}
+
+                {filteredKeywords.length === 0 && (
+                  <div className="text-center py-6 text-xs text-slate-600">
+                    لا توجد ليدز أو كلمات مطابقة...
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
         </div>
 
-        {/* 🌟 الصف السفلي المعدل: زر البحث مصفوف بجانب خانة الـ Max Results المطلوبة */}
-        <div className="flex items-center gap-3 w-full">
-          {/* حقل إدخال الحد الأقصى للنتائج */}
-          <div className="w-28 flex flex-col space-y-1.5 flex-shrink-0">
-            <input 
-              type="number"
-              min={1}
-              max={500}
-              value={maxResults}
-              onChange={(e) => setMaxResults(Number(e.target.value))}
-              placeholder="Max"
-              className="w-full h-[50px] text-center rounded-xl border border-slate-800 bg-slate-950/60 text-sm font-semibold text-slate-100 outline-none transition-all duration-200 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 placeholder-slate-600"
-              title="الحد الأقصى للنتائج المطلوب جلبها"
-            />
-          </div>
-
-          {/* زر البحث الرئيسي يأخذ باقي المساحة المتاحة بالتوافق الكامل */}
-          <button 
-            type="submit" 
-            disabled={isLoading || !state || !keyword} 
-            className="flex-1 h-[50px] rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-xl shadow-blue-600/10 transition-all duration-200 hover:shadow-blue-600/20 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none cursor-pointer flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                <span>Searching Leads...</span>
-              </>
-            ) : (
-              <span>Search Leads</span>
-            )}
-          </button>
-        </div>
+        {/* زر الفلترة والبحث الأساسي */}
+        <button 
+          type="submit" 
+          disabled={isLoading || !state || !keyword} 
+          className="w-full py-4 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+        >
+          <span>إبدأ البحث عن الليدز (Find Leads)</span>
+        </button>
       </form>
 
-      {/* مودال إدخال الكلمات الجماعي */}
+      {/* مودال الإدخال الجماعي */}
       {showBulkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>➕ إضافة مجموعة كلمات مفتاحية</span>
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => setShowBulkModal(false)} 
-                className="text-slate-400 hover:text-white text-sm p-1 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            <form onSubmit={handleBulkAddKeywords} className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-[11px] text-slate-400 mb-2">أدخل كل كلمة في سطر منفصل ليتم إضافتها للولاية المحددة تلقائياً:</p>
-                <textarea 
-                  value={bulkKeywordsText} 
-                  onChange={(e) => setBulkKeywordsText(e.target.value)} 
-                  rows={6} 
-                  required 
-                  placeholder="Real Estate&#10;Roofing Contractors&#10;Plumbing Services" 
-                  className="w-full rounded-xl border border-slate-800 p-3.5 text-xs bg-slate-950 text-slate-100 placeholder-slate-600 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 outline-none resize-none font-mono leading-relaxed" 
-                />
-              </div>
-              <div className="flex justify-end gap-2 text-xs pt-1">
-                <button 
-                  type="button" 
-                  onClick={() => setShowBulkModal(false)} 
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition-colors cursor-pointer font-medium"
-                >
-                  إلغاء
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={isSavingBulk || !bulkKeywordsText.trim()} 
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/10 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-                >
-                  {isSavingBulk ? "جاري الحفظ..." : "حفظ الكلمات"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+        <div className="fixed inset-0
