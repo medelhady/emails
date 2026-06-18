@@ -5,6 +5,14 @@ import { SearchParams } from "@/types";
 import { usStates, CityInfo } from "@/data/usData";
 import { supabase } from "@/lib/supabase"; 
 
+interface KeywordItem {
+  id: number;
+  state_name: string;
+  keyword: string;
+  status: 'ready' | 'searching' | 'completed';
+  last_searched_at: string | null;
+}
+
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
   isLoading: boolean;
@@ -14,70 +22,58 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   // الحقول الأساسية للبحث
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [maxResults, setMaxResults] = useState(50);
-
-  // القوائم الديناميكية وحالات التحميل
+  const [selectedKeyword, setSelectedKeyword] = useState("");
+  
+  // القوائم والبيانات
   const [availableCities, setAvailableCities] = useState<CityInfo[]>([]);
-  const [availableKeywords, setAvailableKeywords] = useState<string[]>([]);
+  const [keywordsTable, setKeywordsTable] = useState<KeywordItem[]>([]);
   const [keywordsLoading, setKeywordsLoading] = useState(false);
 
-  // حقول خاصة بإضافة كلمة مفتاحية جديدة من الصفحة
+  // إدخال كلمة جديدة
   const [newKeyword, setNewKeyword] = useState("");
   const [isAddingKeyword, setIsAddingKeyword] = useState(false);
 
-  // 1. تحديث قائمة المقاطعات فور تغيير الولاية
+  // تحديث قائمة المقاطعات عند تغيير الولاية
   useEffect(() => {
     if (!state) {
       setAvailableCities([]);
       setCity("");
       return;
     }
-    
     const selectedStateInfo = usStates.find(s => s.name === state || s.id === state);
-    if (selectedStateInfo) {
-      setAvailableCities(selectedStateInfo.cities);
-    } else {
-      setAvailableCities([]);
-    }
+    if (selectedStateInfo) setAvailableCities(selectedStateInfo.cities);
     setCity(""); 
   }, [state]);
 
-  // 2. دالة جلب الكلمات المفتاحية (توضع في دالة مستقلة لإعادة استدعائها عند الإضافة)
-  const fetchKeywordsForState = async (selectedState: string) => {
+  // جلب الكلمات وجدولتها بناءً على الولاية المختارة
+  const fetchKeywordsTable = async (selectedState: string) => {
     if (!selectedState) {
-      setAvailableKeywords([]);
-      setKeyword("");
+      setKeywordsTable([]);
       return;
     }
-
     setKeywordsLoading(true);
     try {
       const { data, error } = await supabase
         .from("state_keywords")
-        .select("keyword")
-        .eq("state_name", selectedState);
+        .select("id, state_name, keyword, status, last_searched_at")
+        .eq("state_name", selectedState)
+        .order("id", { ascending: true });
 
       if (error) throw error;
-
-      if (data) {
-        const keywordsList = data.map((item: any) => item.keyword);
-        setAvailableKeywords(Array.from(new Set(keywordsList)));
-      }
+      if (data) setKeywordsTable(data as KeywordItem[]);
     } catch (err) {
-      console.error("Error fetching keywords:", err);
-      setAvailableKeywords([]);
+      console.error("Error fetching keywords table:", err);
     } finally {
       setKeywordsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchKeywordsForState(state);
-    setKeyword(""); 
+    fetchKeywordsTable(state);
+    setSelectedKeyword("");
   }, [state]);
 
-  // 3. دالة إضافة كلمة مفتاحية جديدة إلى سوبابيز مباشرة من الصفحة
+  // إضافة كلمة جديدة للجدول
   const handleAddKeyword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!state || !newKeyword.trim()) return;
@@ -86,131 +82,155 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     try {
       const { error } = await supabase
         .from("state_keywords")
-        .insert([{ state_name: state, keyword: newKeyword.trim() }]);
+        .insert([{ state_name: state, keyword: newKeyword.trim(), status: 'ready' }]);
 
       if (error) throw error;
-
-      // إعادة جلب الكلمات وتحديث القائمة المنسدلة فوراً لرؤية الكلمة الجديدة
-      await fetchKeywordsForState(state);
+      await fetchKeywordsTable(state);
       setNewKeyword("");
-      alert("تمت إضافة الكلمة المفتاحية بنجاح! 🎉");
     } catch (err) {
       console.error("Error adding keyword:", err);
-      alert("حدث خطأ أثناء إضافة الكلمة.");
     } finally {
       setIsAddingKeyword(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSearch({ keyword, maxResults, state, city });
+  // دالة بدء تتبع وتشغيل البحث للكلمة المختارة
+  const handleTriggerSearch = async (kwItem: KeywordItem) => {
+    setSelectedKeyword(kwItem.keyword);
+    
+    // 1. تحديث حالة الكلمة في Supabase لتصبح قيد البحث وتحديث وقت التوقف الحالي
+    try {
+      await supabase
+        .from("state_keywords")
+        .update({ status: 'searching', last_searched_at: new Date().toISOString() })
+        .eq("id", kwItem.id);
+
+      // تحديث الجدول محلياً فوراً
+      setKeywordsTable(prev => prev.map(item => 
+        item.id === kwItem.id ? { ...item, status: 'searching', last_searched_at: new Date().toISOString() } : item
+      ));
+
+      // 2. إطلاق دالة البحث الأساسية لجلب الـ Leads
+      onSearch({ keyword: kwItem.keyword, maxResults: 50, state, city });
+
+      // 3. محاكاة أو تحويل الحالة إلى اكتمال بعد انتهاء طلب البحث
+      await supabase
+        .from("state_keywords")
+        .update({ status: 'completed' })
+        .eq("id", kwItem.id);
+        
+      setKeywordsTable(prev => prev.map(item => 
+        item.id === kwItem.id ? { ...item, status: 'completed' } : item
+      ));
+
+    } catch (err) {
+      console.error("Error updating search pointer status:", err);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* 1. نموذج البحث الأساسي */}
-      <form onSubmit={handleSubmit} className="space-y-4 p-5 rounded-xl border" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
-        <h3 className="text-sm font-bold border-b pb-2 mb-2" style={{ color: "var(--color-text)", borderColor: "var(--color-border)" }}>🔎 محرك فرز وتقصي الـ Leads</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* حقل اختيار الولاية */}
-          <div className="space-y-2 flex flex-col">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>الولاية (State)</label>
-            <select
-              value={state}
-              onChange={(e) => setState(e.target.value)}
-              className="rounded-lg border px-3 py-2 text-sm outline-none cursor-pointer focus:border-blue-500"
-              style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-            >
-              <option value="">Select State...</option>
-              {usStates.map((s) => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* حقل اختيار المقاطعة (County) */}
-          <div className="space-y-2 flex flex-col">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>المقاطعة (County / City)</label>
-            <select
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              disabled={!state || availableCities.length === 0}
-              className="rounded-lg border px-3 py-2 text-sm outline-none cursor-pointer focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-            >
-              <option value="">
-                {!state ? "Select a State first..." : "Select County (Ordered by Population)..."}
-              </option>
-              {availableCities.map((c) => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* خانة كلمة البحث المنسدلة من Supabase */}
+      {/* قسم فلترة الولاية والمقاطعة */}
+      <div className="p-5 rounded-xl border grid grid-cols-1 md:grid-cols-2 gap-4" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
         <div className="space-y-2 flex flex-col">
-          <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>الكلمات المفتاحية الحالية المرفوعة لهذه الولاية</label>
-          <select
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            disabled={!state || keywordsLoading || availableKeywords.length === 0}
-            className="rounded-lg border px-3 py-2 text-sm outline-none cursor-pointer focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-          >
-            <option value="">
-              {!state 
-                ? "Select a State first to view current keywords..." 
-                : keywordsLoading 
-                ? "Loading keywords from Supabase..." 
-                : availableKeywords.length === 0 
-                ? "No keywords found for this state..." 
-                : "Select a Keyword..."}
-            </option>
-            {availableKeywords.map((kw, index) => (
-              <option key={index} value={kw}>{kw}</option>
+          <label className="text-xs font-medium">الولاية الحالية لفرز الكلمات</label>
+          <select value={state} onChange={(e) => setState(e.target.value)} className="rounded-lg border px-3 py-2 text-sm style-input">
+            <option value="">اختر الولاية...</option>
+            {usStates.map((s) => (
+              <option key={s.id} value={s.name}>{s.name}</option>
             ))}
           </select>
         </div>
 
-        <button
-          type="submit"
-          disabled={isLoading || !state || !keyword}
-          className="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          {isLoading ? "Searching..." : "Search Leads"}
-        </button>
-      </form>
+        <div className="space-y-2 flex flex-col">
+          <label className="text-xs font-medium">المقاطعة المستهدفة (County)</label>
+          <select value={city} onChange={(e) => setCity(e.target.value)} disabled={!state} className="rounded-lg border px-3 py-2 text-sm style-input">
+            <option value="">{state ? "جميع المقاطعات المتوفرة..." : "اختر الولاية أولاً..."}</option>
+            {availableCities.map((c) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-      {/* 2. واجهة إدارة وإضافة الكلمات المفتاحية التابعة للولاية */}
-      <div className="p-5 rounded-xl border border-dashed" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
-        <h3 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: "var(--color-text)" }}>
-          ➕ إضافة وتوسيع الكلمات المفتاحية للولاية أونلاين
-        </h3>
-        <p className="text-xs mb-3" style={{ color: "var(--color-text-muted)" }}>
-          اختر الولاية من الأعلى أولاً، ثم اكتب الكلمة الجديدة هنا لحفظها وتحديث القائمة المنسدلة تلقائياً في قاعدة البيانات.
-        </p>
-        
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newKeyword}
-            onChange={(e) => setNewKeyword(e.target.value)}
-            disabled={!state}
-            placeholder={state ? `Add new keyword for ${state}...` : "Please select a state from above first..."}
-            className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:opacity-50"
-            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-          />
-          <button
-            type="button"
-            onClick={handleAddKeyword}
-            disabled={isAddingKeyword || !state || !newKeyword.trim()}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
-          >
-            {isAddingKeyword ? "Saving..." : "إضافة وحفظ"}
-          </button>
+      {/* لوحة تحكم وإدارة الكلمات (الجدول المطور) */}
+      <div className="p-5 rounded-xl border space-y-4" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b pb-3">
+          <div>
+            <h3 className="text-sm font-bold">📋 لوحة مراقبة وإدارة الكلمات بالترقيم</h3>
+            <p className="text-xs text-gray-400">تتبع الكلمات، حالتها، ومؤشر آخر بحث تم القيام به للولاية.</p>
+          </div>
+          
+          {/* حقل الإدخال السريع أعلى الجدول */}
+          <form onSubmit={handleAddKeyword} className="flex gap-2">
+            <input
+              type="text"
+              value={newKeyword}
+              onChange={(e) => setNewKeyword(e.target.value)}
+              disabled={!state}
+              placeholder={state ? "أدخل كلمة جديدة هنا..." : "اختر ولاية للإضافة..."}
+              className="rounded-lg border px-3 py-1.5 text-xs outline-none focus:border-blue-500"
+            />
+            <button type="submit" disabled={isAddingKeyword || !state || !newKeyword.trim()} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors">
+              {isAddingKeyword ? "جاري الحفظ..." : "إضافة"}
+            </button>
+          </form>
+        </div>
+
+        {/* عرض الجدول المرقّم والذكي */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b" style={{ borderColor: "var(--color-border)" }}>
+                <th className="py-2 text-right w-12">#</th>
+                <th className="py-2">الكلمة المفتاحية (Keyword)</th>
+                <th className="py-2 text-center">حالة البحث</th>
+                <th className="py-2 text-center">آخر توقيت للبحث</th>
+                <th className="py-2 text-center">الإجراء</th>
+              </tr>
+            </thead>
+            <tbody>
+              {keywordsLoading ? (
+                <tr><td colSpan={5} className="py-4 text-center">جاري سحب بيانات الكلمات من السوبابيز...</td></tr>
+              ) : keywordsTable.length === 0 ? (
+                <tr><td colSpan={5} className="py-4 text-center text-gray-400">{state ? "لا توجد كلمات مفتاحية مسجلة لهذه الولاية. أضف كلمة جديدة!" : "الرجاء اختيار ولاية من الأعلى لعرض وإدارة جولتها المرقّمة."}</td></tr>
+              ) : (
+                keywordsTable.map((kw, index) => {
+                  const isLastSearched = kw.last_searched_at !== null;
+                  return (
+                    <tr key={kw.id} className={`border-b hover:bg-opacity-20 hover:bg-gray-700 transition-colors ${kw.status === 'searching' ? 'bg-amber-950 bg-opacity-20' : ''}`} style={{ borderColor: "var(--color-border)" }}>
+                      <td className="py-2.5 font-mono text-gray-400 text-right">{index + 1}</td>
+                      <td className="py-2.5 font-medium flex items-center gap-1">
+                        {kw.keyword}
+                        {kw.status === 'searching' && <span className="animate-pulse text-amber-500">⏳</span>}
+                      </td>
+                      <td className="py-2.5 text-center">
+                        {kw.status === 'ready' && <span className="px-2 py-0.5 rounded bg-gray-800 text-gray-300 text-[10px]">جاهزة 🟢</span>}
+                        {kw.status === 'searching' && <span className="px-2 py-0.5 rounded bg-amber-600 text-white text-[10px] animate-pulse">جاري البحث 🟡</span>}
+                        {kw.status === 'completed' && <span className="px-2 py-0.5 rounded bg-blue-900 text-blue-200 text-[10px]">مكتملة ومؤرشفة 🔵</span>}
+                      </td>
+                      <td className="py-2.5 text-center font-mono text-gray-400">
+                        {kw.last_searched_at ? new Date(kw.last_searched_at).toLocaleTimeString() : "لم تبحث بعد"}
+                      </td>
+                      <td className="py-2.5 text-center">
+                        <button
+                          onClick={() => handleTriggerSearch(kw)}
+                          disabled={isLoading}
+                          className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${
+                            kw.status === 'completed' 
+                              ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' 
+                              : 'bg-blue-600 hover:bg-blue-500 text-white'
+                          }`}
+                        >
+                          {kw.status === 'searching' ? "يقوم بالفرز..." : "ابدأ فرز الـ Leads"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
