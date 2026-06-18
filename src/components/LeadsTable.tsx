@@ -1,240 +1,214 @@
 "use client";
 
-import { Lead } from "@/types";
-import { ExternalLink, Mail, ChevronUp, ChevronDown, Copy, Check } from "lucide-react";
 import { useState } from "react";
+import { Lead } from "@/types"; // تأكد من مطابقة مسار الـ Types في مشروعك
 
 interface LeadsTableProps {
   leads: Lead[];
 }
 
-type SortKey = keyof Lead;
-type SortDir = "asc" | "desc";
-
 export function LeadsTable({ leads }: LeadsTableProps) {
-  const [sortKey, setSortKey] = useState<SortKey>("created_at");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [filter, setFilter] = useState("");
-  const [copiedColumn, setCopiedColumn] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [copyFrom, setCopyFrom] = useState<string>("");
+  const [copyTo, setCopyTo] = useState<string>("");
+  const [copiedType, setCopiedType] = useState<string | null>(null);
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
-  };
-
-  const handleCopyColumn = (e: React.MouseEvent, key: "email" | "website") => {
-    e.stopPropagation(); // منع الترتيب عند النسخ
-
-    const valuesToCopy = sorted
-      .map((lead) => lead[key])
-      .filter((value): value is string => !!value && value.trim() !== "");
-
-    if (valuesToCopy.length === 0) return;
-
-    const textToCopy = valuesToCopy.join("\n");
-    navigator.clipboard.writeText(textToCopy);
-
-    setCopiedColumn(key);
-    setTimeout(() => setCopiedColumn(null), 2000);
-  };
-
-  const filtered = leads.filter((l) =>
-    filter === ""
-      ? true
-      : [l.company_name, l.email, l.city, l.state, l.website].some((v) =>
-          v?.toLowerCase().includes(filter.toLowerCase())
-        )
+  // فلترة الليدز بناءً على حقل البحث العلوي
+  const filteredLeads = leads.filter(
+    (lead) =>
+      (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (lead.website && lead.website.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const sorted = [...filtered].sort((a, b) => {
-    const av = a[sortKey] ?? "";
-    const bv = b[sortKey] ?? "";
-    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
-    return sortDir === "asc" ? cmp : -cmp;
-  });
+  // وظيفة نسخ عمود بالكامل (فقط العناصر المفلترة والموجودة حالياً)
+  const handleCopyColumn = (type: "email" | "website") => {
+    const list = filteredLeads
+      .map((lead) => (type === "email" ? lead.email : lead.website))
+      .filter((val) => val && val.trim() !== "");
 
-  const SortIcon = ({ col }: { col: SortKey }) =>
-    sortKey === col ? (
-      sortDir === "asc" ? (
-        <ChevronUp size={12} />
-      ) : (
-        <ChevronDown size={12} />
-      )
-    ) : (
-      <ChevronDown size={12} className="opacity-30" />
-    );
+    if (list.length === 0) return;
 
-  const cols: { key: SortKey; label: string; copyable?: boolean }[] = [
-    { key: "company_name", label: "الشركة" },
-    { key: "email", label: "الإيميل", copyable: true },
-    { key: "website", label: "الموقع", copyable: true },
-    { key: "city", label: "المقاطعة" },
-    { key: "state", label: "الولاية" },
-  ];
+    navigator.clipboard.writeText(list.join("\n"));
+    triggerCopyFeedback(type === "email" ? "جميع الإيميلات" : "جميع المواقع");
+  };
+
+  // وظيفة نسخ نطاق مخصص من X إلى Y
+  const handleCopyRange = (type: "email" | "website") => {
+    const fromIndex = parseInt(copyFrom) - 1;
+    const toIndex = parseInt(copyTo) - 1;
+
+    if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex < 0 || toIndex >= filteredLeads.length || fromIndex > toIndex) {
+      alert("الرجاء إدخال نطاق صفوف صحيح ومتاح في الجدول!");
+      return;
+    }
+
+    const rangeLeads = filteredLeads.slice(fromIndex, toIndex + 1);
+    const list = rangeLeads
+      .map((lead) => (type === "email" ? lead.email : lead.website))
+      .filter((val) => val && val.trim() !== "");
+
+    if (list.length === 0) return;
+
+    navigator.clipboard.writeText(list.join("\n"));
+    triggerCopyFeedback(`النطاق من ${copyFrom} إلى ${copyTo}`);
+  };
+
+  const triggerCopyFeedback = (message: string) => {
+    setCopiedType(message);
+    setTimeout(() => setCopiedType(null), 2500);
+  };
 
   return (
-    <div
-      style={{
-        background: "var(--color-surface)",
-        borderColor: "var(--color-border)",
-      }}
-      className="rounded-xl border"
-    >
-      <div
-        className="flex items-center justify-between gap-4 p-4 border-b"
-        style={{ borderColor: "var(--color-border)" }}
-      >
-        <h2
-          className="font-semibold text-sm uppercase tracking-wider"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          النتائج — {sorted.length} leads
-        </h2>
-        <input
-          type="text"
-          placeholder="فلتر..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          style={{
-            background: "var(--color-surface-2)",
-            borderColor: "var(--color-border)",
-            color: "var(--color-text)",
-          }}
-          className="rounded-lg border px-3 py-1.5 text-sm outline-none focus:border-blue-500 transition-colors w-64 placeholder:text-slate-600"
-        />
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr
-              style={{ borderColor: "var(--color-border)" }}
-              className="border-b"
-            >
-              {cols.map((c) => (
-                <th
-                  key={c.key}
-                  onClick={() => handleSort(c.key)}
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none whitespace-nowrap"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1">
-                      {c.label}
-                      <SortIcon col={c.key} />
-                    </span>
+    <div className="w-full rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-2xl space-y-4 text-slate-200">
+      
+      {/* البار العلوي: الإحصائيات، البحث، وأدوات النسخ المتقدم من X إلى Y */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-bold text-white tracking-wide">Leads — {filteredLeads.length}</h2>
+          {copiedType && (
+            <span className="text-[11px] bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/20 animate-pulse">
+              ✓ تم نسخ {copiedType} بنجاح!
+            </span>
+          )}
+        </div>
 
-                    {/* زر النسخ ملاصق ومحمي وثابت دائماً بجانب السهم */}
-                    {c.copyable && (
-                      <button
-                        onClick={(e) =>
-                          handleCopyColumn(e, c.key as "email" | "website")
-                        }
-                        title={`نسخ كل ${c.label}`}
-                        className="p-1 rounded bg-white/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-colors flex items-center justify-center inline-flex"
-                      >
-                        {copiedColumn === c.key ? (
-                          <span className="flex items-center gap-1 text-green-400 text-[10px] font-normal normal-case px-1">
-                            <Check size={11} /> تم!
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-[10px] font-normal normal-case text-blue-400 hover:text-white px-1">
-                            <Copy size={11} /> نسخ
-                          </span>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </th>
-              ))}
+        {/* أدوات النسخ الذكي من X إلى Y والفلترة */}
+        <div className="flex flex-wrap items-center gap-3">
+          
+          {/* قسم النسخ المخصص */}
+          <div className="flex items-center gap-1.5 bg-slate-950/60 border border-slate-800 px-2.5 py-1.5 rounded-xl text-xs">
+            <span className="text-slate-400">نسخ من</span>
+            <input 
+              type="number" 
+              placeholder="1" 
+              value={copyFrom}
+              onChange={(e) => setCopyFrom(e.target.value)}
+              className="w-12 h-7 text-center bg-slate-900 border border-slate-800 rounded-md outline-none text-white focus:border-blue-500"
+            />
+            <span className="text-slate-400">إلى</span>
+            <input 
+              type="number" 
+              placeholder={filteredLeads.length.toString()} 
+              value={copyTo}
+              onChange={(e) => setCopyTo(e.target.value)}
+              className="w-12 h-7 text-center bg-slate-900 border border-slate-800 rounded-md outline-none text-white focus:border-blue-500"
+            />
+            <div className="flex gap-1 mr-1">
+              <button
+                onClick={() => handleCopyRange("email")}
+                disabled={filteredLeads.length === 0}
+                className="px-2 py-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/20 rounded cursor-pointer transition-colors"
+                title="نسخ نطاق الإيميلات المحدد"
+              >
+                📧 إيميل
+              </button>
+              <button
+                onClick={() => handleCopyRange("website")}
+                disabled={filteredLeads.length === 0}
+                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded cursor-pointer transition-colors"
+                title="نسخ نطاق المواقع المحدد"
+              >
+                🌐 موقع
+              </button>
+            </div>
+          </div>
+
+          {/* خانة البحث */}
+          <input
+            type="text"
+            placeholder="..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-48 bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-100 outline-none transition-all focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* جدول البيانات */}
+      <div className="overflow-x-auto rounded-xl border border-slate-800/60 custom-scrollbar">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-950/40 border-b border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400">
+              {/* عمود الترقيم */}
+              <th className="py-3.5 px-4 w-14 text-center border-r border-slate-800/40">#</th>
+              
+              {/* عمود الإيميل مع خيار نسخ العمود كاملاً */}
+              <th className="py-3.5 px-5 group/th">
+                <div className="flex items-center justify-between">
+                  <span>الإيميل</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyColumn("email")}
+                    className="opacity-0 group-hover/th:opacity-100 p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all text-[10px] flex items-center gap-1 cursor-pointer"
+                    title="نسخ العمود كاملاً"
+                  >
+                    📋 نسخ الكل
+                  </button>
+                </div>
+              </th>
+
+              {/* عمود الموقع مع خيار نسخ العمود كاملاً */}
+              <th className="py-3.5 px-5 group/th">
+                <div className="flex items-center justify-between">
+                  <span>الموقع</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyColumn("website")}
+                    className="opacity-0 group-hover/th:opacity-100 p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all text-[10px] flex items-center gap-1 cursor-pointer"
+                    title="نسخ العمود كاملاً"
+                  >
+                    📋 نسخ الكل
+                  </button>
+                </div>
+              </th>
             </tr>
           </thead>
-          <tbody>
-            {sorted.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="px-4 py-12 text-center"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  لا توجد نتائج بعد.
+          <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
+            {filteredLeads.map((lead, index) => (
+              <tr key={index} className="hover:bg-slate-900/30 transition-colors">
+                
+                {/* رقم الصف التلقائي */}
+                <td className="py-3 px-4 text-center font-mono text-slate-500 bg-slate-950/20 border-r border-slate-800/40">
+                  {(index + 1).toString().padStart(2, '0')}
+                </td>
+
+                {/* قيمة الإيميل */}
+                <td className="py-3 px-5 font-mono text-slate-200">
+                  {lead.email ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 text-xs">✉</span>
+                      <span className="select-all">{lead.email}</span>
+                    </div>
+                  ) : (
+                    <span className="text-slate-600">—</span>
+                  )}
+                </td>
+
+                {/* قيمة الموقع */}
+                <td className="py-3 px-5 text-blue-400 font-mono">
+                  {lead.website ? (
+                    <a
+                      href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline flex items-center gap-1 max-w-xs truncate"
+                    >
+                      <span>↗</span>
+                      <span className="select-all">{lead.website}</span>
+                    </a>
+                  ) : (
+                    <span className="text-slate-600">—</span>
+                  )}
                 </td>
               </tr>
-            ) : (
-              sorted.map((lead, i) => (
-                <tr
-                  key={lead.id ?? i}
-                  className="border-b transition-colors hover:bg-white/[0.02]"
-                  style={{ borderColor: "var(--color-border)" }}
-                >
-                  <td
-                    className="px-4 py-3 font-medium max-w-[200px] truncate"
-                    style={{ color: "var(--color-text)" }}
-                  >
-                    {lead.company_name}
-                  </td>
-                  <td className="px-4 py-3">
-                    {lead.email ? (
-                      <span className="flex items-center gap-1.5 text-blue-400">
-                        <Mail size={12} />
-                        <span className="truncate max-w-[200px]">
-                          {lead.email}
-                        </span>
-                      </span>
-                    ) : (
-                      <span style={{ color: "var(--color-text-muted)" }}>
-                        —
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {lead.website ? (
-                      <a
-                        href={
-                          lead.website.startsWith("http")
-                            ? lead.website
-                            : "https://" + lead.website
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors truncate max-w-[180px]"
-                      >
-                        <ExternalLink size={11} />
-                        {lead.website.replace(/^https?:\/\/(www\.)?/, "")}
-                      </a>
-                    ) : (
-                      <span style={{ color: "var(--color-text-muted)" }}>
-                        —
-                      </span>
-                    )}
-                  </td>
-                  <td
-                    className="px-4 py-3"
-                    style={{ color: "var(--color-text-dim)" }}
-                  >
-                    {lead.city || "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    {lead.state ? (
-                      <span
-                        className="px-2 py-0.5 rounded text-xs font-mono font-medium"
-                        style={{
-                          background: "var(--color-surface-2)",
-                          color: "var(--color-text-muted)",
-                        }}
-                      >
-                        {lead.state}
-                      </span>
-                    ) : (
-                      <span style={{ color: "var(--color-text-muted)" }}>
-                        —
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))
+            ))}
+
+            {filteredLeads.length === 0 && (
+              <tr>
+                <td colSpan={3} className="py-8 text-center text-slate-500 text-xs">
+                  لا توجد ليدز متاحة حالياً للعرض أو البحث المكتوب...
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
