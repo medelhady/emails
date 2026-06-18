@@ -22,6 +22,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [maxResults, setMaxResults] = useState(50); // الحقل المستعاد للعدد المطلوب للبحث
 
   const [availableCities, setAvailableCities] = useState<CityInfo[]>([]);
   const [availableKeywords, setAvailableKeywords] = useState<KeywordItem[]>([]);
@@ -126,7 +127,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         console.error(err);
       }
     }
-    onSearch({ keyword, maxResults: 50, state, city });
+    onSearch({ keyword, maxResults, state, city });
   };
 
   return (
@@ -186,7 +187,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </div>
           </div>
 
-          {/* 🚨 النافذة المنبثقة تفتح للأعلى (bottom-[55px]) فوق الحقول بشكل كامل وممتاز */}
+          {/* النافذة المنبثقة تفتح للأعلى (bottom-[55px]) فوق الحقول */}
           {isDropdownOpen && (
             <div className="absolute left-0 right-0 bottom-[55px] z-[9999] w-full rounded-2xl border border-slate-800 bg-slate-950/98 shadow-2xl p-4 space-y-3 text-right animate-in fade-in slide-in-from-bottom-2 duration-150">
               <div className="border-b border-slate-800/80 pb-2 flex items-center justify-between flex-row-reverse">
@@ -194,7 +195,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 <span className="text-[10px] text-slate-500 font-mono">Supabase Server Sync</span>
               </div>
 
-              {/* قائمة الكلمات مع ترقيم واضح ومساحة مريحة للرؤية */}
+              {/* قائمة الكلمات مع ترقيم واضح */}
               <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
                 {availableKeywords.length === 0 ? (
                   <div className="text-center py-6 text-xs text-slate-500">لا توجد كلمات لهذه الولاية، اضغط (+) لإضافة كلماتك.</div>
@@ -212,7 +213,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                           : 'text-slate-300 hover:bg-slate-900/80 border-transparent'
                       }`}
                     >
-                      {/* الحالة على اليمين */}
                       <span className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded border ${
                         k.status === 'searching' 
                           ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
@@ -221,7 +221,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                         {k.status}
                       </span>
 
-                      {/* الترقيم والكلمة على اليسار متناسقين */}
                       <div className="flex items-center gap-3 flex-row-reverse">
                         <span className="font-mono text-[11px] text-slate-500 bg-slate-900/50 border border-slate-800 px-1.5 py-0.5 rounded">
                           {(index + 1).toString().padStart(2, '0')}
@@ -236,13 +235,29 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           )}
         </div>
 
-        <button 
-          type="submit" 
-          disabled={isLoading || !state || !keyword} 
-          className="w-full py-4 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all cursor-pointer flex items-center justify-center"
-        >
-          <span>{isLoading ? "جاري البحث والمزامنة..." : "إبدأ البحث عن الليدز (Find Leads)"}</span>
-        </button>
+        {/* سطر زر البحث ومعه حقل اختيار العدد الأقصى لنتائج البحث المعاد تصميمه */}
+        <div className="flex items-center gap-3 w-full flex-row-reverse">
+          <button 
+            type="submit" 
+            disabled={isLoading || !state || !keyword} 
+            className="flex-1 py-4 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all cursor-pointer flex items-center justify-center shadow-lg"
+          >
+            <span>{isLoading ? "جاري البحث والمزامنة..." : "إبدأ البحث عن الليدز (Find Leads)"}</span>
+          </button>
+
+          <div className="flex flex-col space-y-1.5 min-w-[90px]">
+            <input 
+              type="number"
+              min="1"
+              max="500"
+              value={maxResults}
+              onChange={(e) => setMaxResults(parseInt(e.target.value) || 50)}
+              className="w-full h-[52px] text-center bg-slate-950 border border-slate-800 rounded-xl outline-none text-white focus:border-blue-500 font-mono font-bold text-sm shadow-inner"
+              title="الحد الأقصى للنتائج"
+            />
+          </div>
+        </div>
+
       </form>
 
       {/* المودال الخاص بالإدخال الجماعي */}
