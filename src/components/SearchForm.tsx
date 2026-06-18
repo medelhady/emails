@@ -27,7 +27,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   const [availableKeywords, setAvailableKeywords] = useState<KeywordItem[]>([]);
   const [keywordsLoading, setKeywordsLoading] = useState(false);
 
-  // التحكم في القائمة المنبثقة العلوية (تتبع الكلمات الجاهزة)
+  // التحكم في القائمة المنبثقة العلوية
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [dropdownSearch, setDropdownSearch] = useState("");
   const [copyFrom, setCopyFrom] = useState<string>("1");
@@ -88,12 +88,12 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     setKeyword("");
   }, [state]);
 
-  // فلترة الكلمات داخل القائمة المنبثقة بناءً على البحث المدمج في الأعلى
+  // فلترة الكلمات داخل القائمة المنبثقة
   const filteredKeywords = availableKeywords.filter((k) =>
     k.keyword.toLowerCase().includes(dropdownSearch.toLowerCase())
   );
 
-  // وظيفة نسخ النطاق المخصص من الكلمات المفتاحية/الأميلات الجاهزة من X إلى Y
+  // نسخ النطاق المخصص
   const handleCopyRange = () => {
     const fromIndex = parseInt(copyFrom) - 1;
     const toIndex = parseInt(copyTo || filteredKeywords.length.toString()) - 1;
@@ -181,12 +181,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
         </div>
 
-        {/* حقل الكلمة المفتاحية وربطه بالقائمة المنبثقة الطائرة المدمجة */}
+        {/* حقل الكلمة المفتاحية والقائمة المنبثقة */}
         <div className="space-y-2.5 flex flex-col relative" ref={dropdownRef}>
           <label className="text-xs font-bold uppercase tracking-wider text-slate-400">كلمة البحث أو النطاق (KEYWORD / DOMAIN)</label>
           <div className="flex items-center gap-2 w-full">
             
-            {/* زر القائمة المنسدلة النظيف والمطابق لتصميم لوحة تحكمك */}
             <button
               type="button"
               disabled={!state || keywordsLoading}
@@ -200,7 +199,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
               </span>
             </button>
 
-            {/* زر الإضافة السريعة مدمج بجانبه */}
             <button 
               type="button" 
               disabled={!state} 
@@ -211,17 +209,15 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
               +
             </button>
 
-            {/* حقل العرض الحالي النصي للكلمة المختارة */}
             <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3.5 text-sm text-slate-400 truncate">
               {keyword || "Select a Keyword from the list..."}
             </div>
           </div>
 
-          {/* 🌟 القائمة المنبثقة الطائرة العلوية الاحترافية والذكية مدمج بها أدوات النسخ والبحث السريع والترقيم التلقائي */}
+          {/* القائمة المنبثقة الطائرة */}
           {isDropdownOpen && (
             <div className="absolute right-0 top-[85px] z-50 w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl p-4 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-150 text-right">
               
-              {/* بار التحكم العلوي داخل القائمة: العنوان، البحث، وأدوات نطاق النسخ من X إلى Y */}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-400">تتبع الكلمات الجاهزة</span>
@@ -230,10 +226,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                   )}
                 </div>
 
-                {/* أدوات التحكم المدمجة: نسخ من وإلى والبحث الداخلي */}
                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                  
-                  {/* شريط أدوات النسخ من X إلى Y مدمج بأناقة */}
                   <div className="flex items-center gap-1 bg-slate-900/80 border border-slate-800 px-2 py-1 rounded-lg text-[11px]">
                     <span className="text-slate-500">نسخ من</span>
                     <input 
@@ -260,7 +253,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                     </button>
                   </div>
 
-                  {/* حقل البحث السريع التابع للمنبثقة */}
                   <input
                     type="text"
                     placeholder="بحث سريع..."
@@ -271,7 +263,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 </div>
               </div>
 
-              {/* قائمة العناصر والكلمات المجلوبة مع الترقيم التسلسلي الزوجي والتفاعلي */}
               <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                 {filteredKeywords.map((k, index) => (
                   <div
@@ -287,7 +278,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      {/* الترقيم التسلسلي الاحترافي */}
                       <span className="font-mono text-[11px] text-slate-600 group-hover:text-slate-400">
                         {(index + 1).toString().padStart(2, '0')}
                       </span>
@@ -314,7 +304,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           )}
         </div>
 
-        {/* زر الفلترة والبحث الأساسي */}
         <button 
           type="submit" 
           disabled={isLoading || !state || !keyword} 
@@ -324,6 +313,24 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         </button>
       </form>
 
-      {/* مودال الإدخال الجماعي */}
+      {/* مودال الإدخال الجماعي - مغلق بالكامل هنا وبدون أي انقطاع */}
       {showBulkModal && (
-        <div className="fixed inset-0
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white">➕ إضافة مجموعة كلمات مفتاحية</h3>
+              <button type="button" onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-white text-sm p-1">✕</button>
+            </div>
+            <form onSubmit={handleBulkAddKeywords} className="space-y-4">
+              <textarea value={bulkKeywordsText} onChange={(e) => setBulkKeywordsText(e.target.value)} rows={6} required placeholder="Real Estate&#10;Roofing Contractors" className="w-full rounded-xl border border-slate-800 p-3.5 text-xs bg-slate-950 text-slate-100 placeholder-slate-600 focus:border-blue-500 outline-none resize-none" />
+              <div className="flex justify-end gap-2 text-xs">
+                <button type="button" onClick={() => setShowBulkModal(false)} className="px-4 py-2 bg-slate-800 text-slate-200 rounded-xl">إلغاء</button>
+                <button type="submit" disabled={isSavingBulk || !bulkKeywordsText.trim()} className="px-5 py-2 bg-blue-600 text-white rounded-xl font-semibold">{isSavingBulk ? "جاري الحفظ..." : "حفظ الكلمات"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
