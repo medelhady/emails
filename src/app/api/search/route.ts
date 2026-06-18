@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { scrapeGoogleMaps } from "@/lib/apify";
 import { scrapeEmails } from "@/lib/scraper";
-import { supabase, checkDuplicate, insertLead } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(req: Request) {
   try {
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
       let emails: string[] = [];
 
-      // إذا كان هناك موقع إلكتروني، نحاول فحص الإيميلات
+      // محاولة فحص الموقع بحثاً عن إيميلات
       if (website) {
         try {
           emails = await scrapeEmails(website);
@@ -41,15 +41,9 @@ export async function POST(req: Request) {
         }
       }
 
-      // إذا تم العثور على إيميلات، نقوم بحفظ كل إيميل كـ Lead منفصل
+      // حالة 1: تم العثور على إيميلات داخل الموقع
       if (emails.length > 0) {
         for (const email of emails) {
-          const isDuplicate = await checkDuplicate(website, email);
-          if (isDuplicate) {
-            skippedDuplicatesCount++;
-            continue;
-          }
-
           const newLead = {
             company_name: companyName,
             website: website,
@@ -61,30 +55,34 @@ export async function POST(req: Request) {
             reviews: reviews,
           };
 
-          try {
-            const saved = await insertLead(newLead);
-            if (saved) {
-              currentSearchLeads.push(saved);
-              emailsFoundCount++;
+          // إدخال البيانات دون استخدام .single() لتجنب انهيار الدالة في حال التكرار
+          const { data: savedArray, error: insertError } = await supabase
+            .from("leads")
+            .insert([newLead])
+            .select();
+
+          if (insertError) {
+            // إذا كان الخطأ مكرر بسبب الـ Unique Constraint في قاعدة البيانات
+            if (insertError.code === "23505") {
+              skippedDuplicatesCount++;
+            } else {
+              console.error("Insertion error:", insertError.message);
             }
-          } catch (dbError) {
-            console.error("Database insert error:", dbError);
+            continue;
+          }
+
+          if (savedArray && savedArray.length > 0) {
+            currentSearchLeads.push(savedArray[0]);
+            emailsFoundCount++;
           }
         }
-      } else {
-        // التعديل الجوهري: إذا لم يجد إيميل، نحفظ الشركة مفرغة الإيميل لكي تظهر بالجدول!
-        // نتحقق أولاً بالاعتماد على الموقع إذا كان مكرراً
-        const isDuplicate = website ? await checkDuplicate(website, "") : false;
-        
-        if (isDuplicate) {
-          skippedDuplicatesCount++;
-          continue;
-        }
-
+      } 
+      // حالة 2: لم يتم العثور على إيميلات (نحفظ الشركة مفرغة الإيميل لعرضها)
+      else {
         const noEmailLead = {
           company_name: companyName,
           website: website,
-          email: "", // فارغ
+          email: "", 
           phone: phone,
           city: city,
           state: state,
@@ -92,18 +90,27 @@ export async function POST(req: Request) {
           reviews: reviews,
         };
 
-        try {
-          const saved = await insertLead(noEmailLead);
-          if (saved) {
-            currentSearchLeads.push(saved);
+        const { data: savedArray, error: insertError } = await supabase
+          .from("leads")
+          .insert([noEmailLead])
+          .select();
+
+        if (insertError) {
+          if (insertError.code === "23505") {
+            skippedDuplicatesCount++;
+          } else {
+            console.error("Insertion error (No Email):", insertError.message);
           }
-        } catch (dbError) {
-          console.error("Database insert error for empty email lead:", dbError);
+          continue;
+        }
+
+        if (savedArray && savedArray.length > 0) {
+          currentSearchLeads.push(savedArray[0]);
         }
       }
     }
 
-    // إرجاع الإحصائيات مع قائمة البيانات التي تم جلبها في هذا البحث لعرضها فوراً
+    // إرجاع النتائج المستقرة للواجهة الأمامية
     return NextResponse.json({
       stats: {
         companiesFound: places.length,
