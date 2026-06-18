@@ -87,23 +87,69 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     setKeyword(""); 
   }, [state]);
 
+  // 🌟 وظيفة حذف كلمة محددة من سوبابيز
+  const handleDeleteKeyword = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // منع إغلاق القائمة أو اختيار الكلمة بالخطأ عند الضغط على X
+    try {
+      const { error } = await supabase
+        .from("state_keywords")
+        .delete()
+        .eq("id", id);
+      
+      if (error) throw error;
+      
+      // تحديث القائمة محلياً فوراً لتجربة مستخدم سريعة
+      setAvailableKeywords(prev => prev.filter(k => k.id !== id));
+      if (keyword && availableKeywords.find(k => k.id === id)?.keyword === keyword) {
+        setKeyword("");
+      }
+    } catch (err) {
+      console.error("Error deleting keyword:", err);
+    }
+  };
+
+  // 🌟 وظيفة الإضافة الجماعية مع منع التكرار تماماً
   const handleBulkAddKeywords = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!state || !bulkKeywordsText.trim()) return;
 
     setIsSavingBulk(true);
-    const arr = bulkKeywordsText
+    
+    // تنظيف الكلمات المدخلة وتحويلها إلى مصفوفة نظيفة
+    const inputKeywords = bulkKeywordsText
       .split("\n")
       .map(k => k.trim())
       .filter(k => k.length > 0);
 
-    if (arr.length === 0) {
-      setIsSavingBulk(false)
+    if (inputKeywords.length === 0) {
+      setIsSavingBulk(false);
       return;
     }
 
     try {
-      const rows = arr.map(kw => ({
+      // 1. جلب الكلمات الحالية للولاية من قاعدة البيانات للمقارنة ومنع التكرار
+      const { data: existingData } = await supabase
+        .from("state_keywords")
+        .select("keyword")
+        .eq("state_name", state);
+
+      const existingKeywordsSet = new Set(
+        existingData ? existingData.map(d => d.keyword.toLowerCase()) : []
+      );
+
+      // 2. تصفية المدخلات لاستبعاد ما هو موجود مسبقاً (ومنع تكرار المدخلات الجديدة في نفس اللحظة)
+      const uniqueNewKeywords = Array.from(new Set(inputKeywords))
+        .filter(kw => !existingKeywordsSet.has(kw.toLowerCase()));
+
+      if (uniqueNewKeywords.length === 0) {
+        alert("جميع الكلمات المدخلة موجودة بالفعل لهذه الولاية!");
+        setIsSavingBulk(false);
+        setShowBulkModal(false);
+        return;
+      }
+
+      // 3. بناء الصفوف الجديدة وضخها في سوبابيز
+      const rows = uniqueNewKeywords.map(kw => ({
         state_name: state,
         keyword: kw,
         status: 'ready'
@@ -176,9 +222,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
         </div>
 
-        {/* حقل الكلمات المفتاحية مع فتح القائمة إلى الأعلى */}
+        {/* حقل الكلمات المفتاحية */}
         <div className="space-y-2 flex flex-col relative">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-400">كلمة البحث (Keyword)</label>
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            كلمة البحث (Keyword) {availableKeywords.length > 0 && `(${availableKeywords.length})`}
+          </label>
           
           <div className="flex items-center gap-2 w-full">
             <div className="relative flex-1">
@@ -189,7 +237,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition-all duration-200 focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 <option value="" className="bg-slate-950">
-                  {!state ? "Select State first..." : keywordsLoading ? "Loading keywords..." : availableKeywords.length === 0 ? "No keywords available..." : "Select a Keyword..."}
+                  {!state ? "Select State first..." : keywordsLoading ? "Loading keywords..." : availableKeywords.length === 0 ? "No keywords available..." : `Select a Keyword... (${availableKeywords.length})`}
                 </option>
                 {availableKeywords.map((k) => <option key={k.id} value={k.keyword} className="bg-slate-950">{k.keyword}</option>)}
               </select>
@@ -203,7 +251,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
               className="flex items-center gap-1.5 h-[46px] px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer whitespace-nowrap shadow-md"
               title="عرض القائمة"
             >
-              🗂️ <span>القائمة</span>
+              🗂️ <span>القائمة ({availableKeywords.length})</span>
             </button>
             
             <button 
@@ -217,11 +265,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </button>
           </div>
 
-          {/* 🌟 تعديل هنا: القائمة تفتح إلى الأعلى الآن بشكل كامل ومريح للتتبع */}
+          {/* قائمة الكلمات الطائرة تفتح للأعلى وتدعم الحذف الفوري وعداد رقمي لكل عنصر */}
           {showMiniList && (
             <div ref={miniListRef} className="absolute left-0 bottom-[54px] z-30 w-80 rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
               <div className="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/40 rounded-t-xl">
-                <span className="text-xs font-bold text-slate-400">تتبع الكلمات الجاهزة</span>
+                <span className="text-xs font-bold text-slate-400">تتبع الكلمات الجاهزة ({availableKeywords.length})</span>
                 <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20 font-medium">➜ النشط حالياً</span>
               </div>
               <div className="max-h-56 overflow-y-auto p-2 space-y-0.5 custom-scrollbar">
@@ -237,15 +285,28 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                           : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-slate-500 group-hover/item:text-slate-400">{(index + 1).toString().padStart(2, '0')}</span>
-                        <span className="truncate max-w-[180px]">{k.keyword}</span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-[10px] font-mono text-slate-500 group-hover/item:text-slate-400 flex-shrink-0">{(index + 1).toString().padStart(2, '0')}</span>
+                        <span className="truncate pr-2">{k.keyword}</span>
                       </div>
-                      {isCurrent ? (
-                        <span className="text-blue-400 text-[10px]">➜</span>
-                      ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-slate-900 border border-slate-800 text-slate-500 rounded group-hover/item:border-slate-700 group-hover/item:text-slate-400 transition-colors uppercase">{k.status}</span>
-                      )}
+                      
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {isCurrent ? (
+                          <span className="text-blue-400 text-[10px]">➜</span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-900 border border-slate-800 text-slate-500 rounded group-hover/item:border-slate-700 group-hover/item:text-slate-400 transition-colors uppercase">{k.status}</span>
+                        )}
+                        
+                        {/* زر الحذف x الصغير والأنيق جداً */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteKeyword(k.id, e)}
+                          className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all duration-150 text-[11px]"
+                          title="حذف الكلمة"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
