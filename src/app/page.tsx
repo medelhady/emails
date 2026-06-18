@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, Building2, ExternalLink, ChevronDown } from "lucide-react";
+import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, ExternalLink, ChevronDown } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { SearchForm } from "@/components/SearchForm";
-import { LeadsTable } from "@/components/LeadsTable";
 import { supabase } from "@/lib/supabase";
 import { Lead, SearchParams, SearchResult } from "@/types";
 
@@ -289,7 +288,6 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-        <LeadsTable leads={leads} />
       </main>
     </div>
   );
