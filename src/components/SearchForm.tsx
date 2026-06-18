@@ -1,15 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { SearchParams } from "@/types";
-
-const US_STATES = [
-  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
-  "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
-  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
-  "VA","WA","WV","WI","WY",
-];
+import { usStates, CityInfo } from "@/data/usData"; // المسار الجديد هنا
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -17,137 +10,80 @@ interface SearchFormProps {
 }
 
 export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
-  const [params, setParams] = useState<SearchParams>({
-    keyword: "property management company",
-    city: "",
-    state: "CA",
-    maxResults: 20,
-  });
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+  const [availableCities, setAvailableCities] = useState<CityInfo[]>([]);
 
-  const handleSubmit = () => {
-    if (!params.city.trim()) return;
-    onSearch(params);
+  // تحديث قائمة المقاطعات فور تغيير الولاية
+  useEffect(() => {
+    if (!state) {
+      setAvailableCities([]);
+      setCity("");
+      return;
+    }
+    
+    const selectedStateInfo = usStates.find(s => s.name === state || s.id === state);
+    if (selectedStateInfo) {
+      setAvailableCities(selectedStateInfo.cities);
+    } else {
+      setAvailableCities([]);
+    }
+    setCity(""); 
+  }, [state]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSearch({ state, city });
   };
 
   return (
-    <div
-      style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
-      className="rounded-xl border p-6"
-    >
-      <h2 className="text-lg font-semibold mb-5" style={{ color: "var(--color-text)" }}>
-        Search Parameters
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Keyword */}
-        <div className="lg:col-span-2">
-          <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
-            Keyword
-          </label>
-          <input
-            type="text"
-            value={params.keyword}
-            onChange={(e) => setParams((p) => ({ ...p, keyword: e.target.value }))}
-            placeholder="property management company"
-            style={{
-              background: "var(--color-surface-2)",
-              borderColor: "var(--color-border)",
-              color: "var(--color-text)",
-            }}
-            className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors placeholder:text-slate-600"
-          />
-        </div>
-
-        {/* City */}
-        <div>
-          <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
-            City
-          </label>
-          <input
-            type="text"
-            value={params.city}
-            onChange={(e) => setParams((p) => ({ ...p, city: e.target.value }))}
-            placeholder="Los Angeles"
-            style={{
-              background: "var(--color-surface-2)",
-              borderColor: "var(--color-border)",
-              color: "var(--color-text)",
-            }}
-            className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors placeholder:text-slate-600"
-          />
-        </div>
-
-        {/* State */}
-        <div>
-          <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
-            State
-          </label>
+    <form onSubmit={handleSubmit} className="space-y-4 p-4 rounded-xl border bg-card text-card-foreground" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        {/* خانة اختيار الولاية */}
+        <div className="space-y-2 flex flex-col">
+          <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>الولاية (State)</label>
           <select
-            value={params.state}
-            onChange={(e) => setParams((p) => ({ ...p, state: e.target.value }))}
-            style={{
-              background: "var(--color-surface-2)",
-              borderColor: "var(--color-border)",
-              color: "var(--color-text)",
-            }}
-            className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors"
+            value={state}
+            onChange={(e) => setState(e.target.value)}
+            className="rounded-lg border px-3 py-2 text-sm outline-none cursor-pointer focus:border-blue-500"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
           >
-            {US_STATES.map((s) => (
-              <option key={s} value={s}>{s}</option>
+            <option value="">Select State...</option>
+            {usStates.map((s) => (
+              <option key={s.id} value={s.name}>{s.name}</option>
             ))}
           </select>
         </div>
 
-        {/* Max Results */}
-        <div>
-          <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
-            Max Results
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={params.maxResults}
-            onChange={(e) => setParams((p) => ({ ...p, maxResults: Number(e.target.value) }))}
-            style={{
-              background: "var(--color-surface-2)",
-              borderColor: "var(--color-border)",
-              color: "var(--color-text)",
-            }}
-            className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors"
-          />
+        {/* خانة اختيار المقاطعة (County) */}
+        <div className="space-y-2 flex flex-col">
+          <label className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>المقاطعة (County / City)</label>
+          <select
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            disabled={!state || availableCities.length === 0}
+            className="rounded-lg border px-3 py-2 text-sm outline-none cursor-pointer focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
+          >
+            <option value="">
+              {!state ? "Select a State first..." : "Select County (Ordered by Population)..."}
+            </option>
+            {availableCities.map((c) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Submit */}
-        <div className="lg:col-span-3 flex items-end">
-          <button
-            onClick={handleSubmit}
-            disabled={isLoading || !params.city.trim()}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            style={{ background: isLoading ? "var(--color-accent-dim)" : "var(--color-accent)", color: "#fff" }}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Scraping…
-              </>
-            ) : (
-              <>
-                <Search size={16} />
-                Find Leads
-              </>
-            )}
-          </button>
-        </div>
       </div>
 
-      {isLoading && (
-        <div className="mt-4 p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
-          <p className="text-sm text-blue-400 flex items-center gap-2">
-            <Loader2 size={14} className="animate-spin" />
-            Running Apify Google Maps Scraper, then visiting each website to extract emails. This may take 2–5 minutes…
-          </p>
-        </div>
-      )}
-    </div>
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-colors disabled:opacity-50"
+      >
+        {isLoading ? "Searching..." : "Search Leads"}
+      </button>
+    </form>
   );
 }
