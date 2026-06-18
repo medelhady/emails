@@ -25,22 +25,18 @@ export function LeadsTable({ leads }: LeadsTableProps) {
     }
   };
 
-  // دالة نسخ العمود بالكامل
   const handleCopyColumn = (e: React.MouseEvent, key: "email" | "website") => {
-    e.stopPropagation(); // منع تفعيل الفرز عند الضغط على زر النسخ
+    e.stopPropagation(); // منع الترتيب عند النسخ
 
-    // استخراج القيم الفريدة وغير الفارغة من الجدول المفلتر والمصفى حالياً
     const valuesToCopy = sorted
       .map((lead) => lead[key])
       .filter((value): value is string => !!value && value.trim() !== "");
 
     if (valuesToCopy.length === 0) return;
 
-    // دمج العناصر بسطر جديد ونسخها للحافظة
     const textToCopy = valuesToCopy.join("\n");
     navigator.clipboard.writeText(textToCopy);
 
-    // إظهار تلميح "تم النسخ" مؤقتاً لمدة ثانيتين
     setCopiedColumn(key);
     setTimeout(() => setCopiedColumn(null), 2000);
   };
@@ -121,30 +117,32 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                 <th
                   key={c.key}
                   onClick={() => handleSort(c.key)}
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none whitespace-nowrap group"
+                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none whitespace-nowrap"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-4 justify-between">
                     <span className="flex items-center gap-1">
                       {c.label}
                       <SortIcon col={c.key} />
                     </span>
 
-                    {/* زر نسخ العمود يظهر فقط للأعمدة القابلة للنسخ وعند تمرير الفأرة Group Hover */}
+                    {/* أزرار ثابتة ومرئية دائماً لمنع مشاكل الـ CSS */}
                     {c.copyable && (
                       <button
                         onClick={(e) =>
                           handleCopyColumn(e, c.key as "email" | "website")
                         }
                         title={`نسخ كل ${c.label}`}
-                        className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-blue-400 transition-colors ml-2"
                       >
                         {copiedColumn === c.key ? (
                           <span className="flex items-center gap-1 text-green-400 text-[10px] font-normal normal-case">
                             <Check size={11} /> تم!
                           </span>
                         ) : (
-                          <Copy size={11} />
+                          <span className="flex items-center gap-1 text-[10px] font-normal normal-case text-slate-400">
+                            <Copy size={11} /> نسخ
+                          </span>
                         )}
                       </button>
                     )}
