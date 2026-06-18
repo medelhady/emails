@@ -13,13 +13,13 @@ export function LeadsTable({ leads }: LeadsTableProps) {
   const [copyTo, setCopyTo] = useState("");
   const [copiedFeedback, setCopiedFeedback] = useState(false);
 
-  // الفلترة بناءً على حقل البحث المكتوب
+  // الفلترة بناءً على حقل البحث
   const filteredLeads = leads.filter(lead => 
     lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.website?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // دالة نسخ النطاق المخصصة من X إلى Y
+  // دالة نسخ النطاق المخصصة
   const handleCopyRange = () => {
     const fromIndex = parseInt(copyFrom) - 1;
     const toIndex = parseInt(copyTo || filteredLeads.length.toString()) - 1;
@@ -45,7 +45,7 @@ export function LeadsTable({ leads }: LeadsTableProps) {
   return (
     <div className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-6 space-y-4 shadow-xl">
       
-      {/* شريط التحكم العلوي فوق الجدول */}
+      {/* شريط التحكم العلوي */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-900 pb-4">
         <div className="flex items-center gap-3">
           <h2 className="text-base font-bold text-white">Leads — {filteredLeads.length}</h2>
@@ -54,10 +54,8 @@ export function LeadsTable({ leads }: LeadsTableProps) {
           )}
         </div>
 
-        {/* أدوات الفلترة والنسخ المتقدمة المستقرة هنا */}
+        {/* أدوات الفلترة والنسخ */}
         <div className="flex flex-wrap items-center gap-3 justify-end">
-          
-          {/* شريط نسخ النطاق المخصص المستقر */}
           <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
             <span className="text-slate-400">نسخ من</span>
             <input 
@@ -84,7 +82,6 @@ export function LeadsTable({ leads }: LeadsTableProps) {
             </button>
           </div>
 
-          {/* صندوق البحث الداخلي */}
           <input
             type="text"
             placeholder="بحث داخل النتائج..."
@@ -107,9 +104,13 @@ export function LeadsTable({ leads }: LeadsTableProps) {
           </thead>
           <tbody className="divide-y divide-slate-900/60 text-slate-300">
             {filteredLeads.map((lead, index) => (
-              <tr key={lead.id || index} className="hover:bg-slate-900/30 transition-colors">
-                <td className="py-3.5 px-4 text-center font-mono text-slate-600">{(index + 1).toString().padStart(2, '0')}</td>
-                <td className="py-3.5 px-4 text-right font-mono text-blue-400">{lead.email || "—"}</td>
+              <tr key={index} className="hover:bg-slate-900/30 transition-colors">
+                <td className="py-3.5 px-4 text-center font-mono text-slate-600">
+                  {(index + 1).toString().padStart(2, '0')}
+                </td>
+                <td className="py-3.5 px-4 text-right font-mono text-blue-400">
+                  {lead.email || "—"}
+                </td>
                 <td className="py-3.5 px-4 text-left truncate max-w-xs text-slate-400">
                   {lead.website ? (
                     <a href={lead.website} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
@@ -126,7 +127,7 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                   لا توجد ليدز متاحة حالياً للعرض أو البحث المكتوب...
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
