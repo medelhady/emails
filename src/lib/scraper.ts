@@ -1,20 +1,22 @@
 const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
 
+// توسيع قائمة النطاقات المستبعدة لضمان جودة البيانات المفلترة
 const EXCLUDE_DOMAINS = [
   "sentry.io", "example.com", "domain.com", "email.com",
   "yoursite.com", "yourdomain.com", "company.com", "placeholder.com",
-  "wixpress.com", "squarespace.com", "wordpress.com",
+  "wixpress.com", "squarespace.com", "wordpress.com", "wix.com"
 ];
 
-const PATHS = ["", "/contact", "/contact-us", "/about", "/about-us", "/team"];
+// 🎯 تم اختصار المسارات إلى الصفحة الرئيسية فقط لمنع سحب الروابط الفرعية المكلفة وتقليل الاستهلاك
+const PATHS = [""]; 
 
 function cleanEmails(emails: string[]): string[] {
   return [...new Set(emails)].filter((email) => {
     const domain = email.split("@")[1]?.toLowerCase();
     if (!domain) return false;
     if (EXCLUDE_DOMAINS.some((d) => domain.includes(d))) return false;
-    if (email.endsWith(".png") || email.endsWith(".jpg") || email.endsWith(".gif")) return false;
-    if (email.includes("noreply") || email.includes("no-reply")) return false;
+    if (email.endsWith(".png") || email.endsWith(".jpg") || email.endsWith(".gif") || email.endsWith(".webp")) return false;
+    if (email.includes("noreply") || email.includes("no-reply") || email.includes("privacy")) return false;
     return true;
   });
 }
@@ -22,7 +24,8 @@ function cleanEmails(emails: string[]): string[] {
 async function fetchPage(url: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    // تقليص الـ Timeout إلى 5 ثوانٍ لعدم تجميد السيرفر مع المواقع الميتة
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
     const res = await fetch(url, {
       signal: controller.signal,
@@ -57,10 +60,10 @@ export async function scrapeEmails(websiteUrl: string): Promise<string[]> {
       const html = await fetchPage(url);
       if (!html) return;
 
-      // Extract from raw HTML (catches mailto links, text, etc.)
+      // استخراج الإيميلات من كود HTML الخام
       const found = html.match(EMAIL_REGEX) ?? [];
 
-      // Also decode HTML entities and re-search
+      // فك تشفير الكود وإعادة البحث عن الإيميلات المموهة
       const decoded = html
         .replace(/&#64;/g, "@")
         .replace(/&#x40;/g, "@")

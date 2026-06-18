@@ -4,36 +4,28 @@ import { supabase } from "@/lib/supabase";
 export async function GET() {
   const { data, error } = await supabase
     .from("leads")
-    .select("*")
+    .select("id, company_name, website, email, created_at") // جلب الحقول المطلوبة فقط لتسريع الاستعلام
     .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // 🛡️ تحديد الأعمدة الأساسية المطلوبة فقط وحذف الباقي (الهواتف، التقييمات، إلخ)
   const headers = [
     "ID",
     "Company Name",
     "Website",
     "Email",
-    "Phone",
-    "City",
-    "State",
-    "Rating",
-    "Reviews",
     "Created At",
   ];
 
+  // ترتيب البيانات بناءً على الأعمدة الجديدة المصفاة
   const rows = (data ?? []).map((lead) => [
     lead.id,
     `"${(lead.company_name ?? "").replace(/"/g, '""')}"`,
     lead.website ?? "",
     lead.email ?? "",
-    lead.phone ?? "",
-    lead.city ?? "",
-    lead.state ?? "",
-    lead.rating ?? "",
-    lead.reviews ?? "",
     lead.created_at ?? "",
   ]);
 
