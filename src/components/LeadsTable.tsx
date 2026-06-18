@@ -13,13 +13,13 @@ export function LeadsTable({ leads }: LeadsTableProps) {
   const [copyTo, setCopyTo] = useState("");
   const [copiedFeedback, setCopiedFeedback] = useState(false);
 
-  // الفلترة بناءً على حقل البحث
+  // الفلترة بناءً على حقل البحث المكتوب
   const filteredLeads = leads.filter(lead => 
     lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.website?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // دالة نسخ النطاق الصحيحة
+  // دالة نسخ النطاق المخصصة من X إلى Y
   const handleCopyRange = () => {
     const fromIndex = parseInt(copyFrom) - 1;
     const toIndex = parseInt(copyTo || filteredLeads.length.toString()) - 1;
@@ -54,7 +54,7 @@ export function LeadsTable({ leads }: LeadsTableProps) {
           )}
         </div>
 
-        {/* أدوات الفلترة والنسخ المتقدمة */}
+        {/* أدوات الفلترة والنسخ المتقدمة المستقرة هنا */}
         <div className="flex flex-wrap items-center gap-3 justify-end">
           
           {/* شريط نسخ النطاق المخصص المستقر */}
