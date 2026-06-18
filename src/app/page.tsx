@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, ExternalLink, ChevronDown, Building2 } from "lucide-react";
+import { Mail, Download, AlertCircle, CheckCircle, Radar, Users, Plus, X, ExternalLink, ChevronDown, Building2, Copy, Check } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { SearchForm } from "@/components/SearchForm";
 import { supabase } from "@/lib/supabase";
@@ -20,6 +20,9 @@ export default function Dashboard() {
   const [manualEmails, setManualEmails] = useState("");
   const [addingEmails, setAddingEmails] = useState(false);
   const [addResult, setAddResult] = useState<string | null>(null);
+  
+  // حالة لإظهار إشعار النسخ لكل عمود بشكل منفصل
+  const [copiedColumn, setCopiedColumn] = useState<"email" | "website" | null>(null);
 
   const loadLeads = useCallback(async () => {
     const { data } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
@@ -97,6 +100,24 @@ export default function Dashboard() {
     setAddingEmails(false);
   };
 
+  // دالة نسخ العمود بالكامل مفصولاً بسطور جديدة
+  const copyColumnData = (type: "email" | "website") => {
+    const activeLeads = searchLeads;
+    if (activeLeads.length === 0) return;
+
+    const itemsToCopy = activeLeads
+      .map((lead) => lead[type])
+      .filter((val): val is string => !!val && val.trim() !== "");
+
+    if (itemsToCopy.length === 0) return;
+
+    const finalClipboardText = itemsToCopy.join("\n");
+    navigator.clipboard.writeText(finalClipboardText);
+
+    setCopiedColumn(type);
+    setTimeout(() => setCopiedColumn(null), 2000);
+  };
+
   const filteredLeads = leads.filter((l) =>
     leadsFilter === ""
       ? true
@@ -119,7 +140,6 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-
             {/* Leads Dropdown */}
             <div className="relative">
               <button
@@ -297,19 +317,65 @@ export default function Dashboard() {
         {/* Search Results Table */}
         {searchLeads.length > 0 && (
           <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
-            <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: "var(--color-border)" }}>
-              <Building2 size={14} className="text-blue-400" />
-              <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
-                نتائج البحث — {searchLeads.length}
-              </span>
+            <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--color-border)" }}>
+              <div className="flex items-center gap-2">
+                <Building2 size={14} className="text-blue-400" />
+                <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                  نتائج البحث — {searchLeads.length}
+                </span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b" style={{ borderColor: "var(--color-border)" }}>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>الشركة</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>الإيميل</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>الموقع</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
+                      الشركة
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
+                      <div className="flex items-center gap-2">
+                        <span>الإيميل</span>
+                        {/* زر نسخ عمود الإيميلات المدمج */}
+                        <button 
+                          onClick={() => copyColumnData("email")}
+                          className="px-2 py-0.5 text-[10px] font-normal normal-case rounded bg-white/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          {copiedColumn === "email" ? (
+                            <>
+                              <Check size={10} className="text-emerald-400" />
+                              <span className="text-emerald-400">تم النسخ!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={10} />
+                              <span>نسخ العمود</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
+                      <div className="flex items-center gap-2">
+                        <span>الموقع</span>
+                        {/* زر نسخ عمود المواقع المدمج */}
+                        <button 
+                          onClick={() => copyColumnData("website")}
+                          className="px-2 py-0.5 text-[10px] font-normal normal-case rounded bg-white/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          {copiedColumn === "website" ? (
+                            <>
+                              <Check size={10} className="text-emerald-400" />
+                              <span className="text-emerald-400">تم النسخ!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={10} />
+                              <span>نسخ العمود</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
