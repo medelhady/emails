@@ -1,141 +1,122 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { scrapeGoogleMaps } from "@/lib/apify";
 import { scrapeEmails } from "@/lib/scraper";
-import { supabase } from "@/lib/supabase";
-import { Lead, SearchResult } from "@/types";
+import { supabase, checkDuplicate, insertLead } from "@/lib/supabase";
 
-export const maxDuration = 300; // 5 min Vercel timeout
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { keyword, city, state, maxResults } = body;
 
     if (!keyword || !city || !state) {
-      return NextResponse.json({ error: "keyword, city, and state are required" }, { status: 400 });
-    }
-
-    const result: SearchResult = {
-      leads: [],
-      stats: { companiesFound: 0, emailsFound: 0, skippedDuplicates: 0 },
-      errors: [],
-    };
-
-    // Step 1: Scrape Google Maps via Apify
-    let places;
-    try {
-      places = await scrapeGoogleMaps(keyword, city, state, maxResults ?? 20);
-    } catch (e: unknown) {
       return NextResponse.json(
-        { error: `Apify scrape failed: ${e instanceof Error ? e.message : String(e)}` },
-        { status: 500 }
+        { error: "Missing required fields: keyword, city, state" },
+        { status: 400 }
       );
     }
 
-    result.stats.companiesFound = places.length;
+    // 1. جلب الشركات من Google Maps عبر Apify
+    const places = await scrapeGoogleMaps(keyword, city, state, Number(maxResults || 5));
+    
+    let emailsFoundCount = 0;
+    let skippedDuplicatesCount = 0;
+    const currentSearchLeads: any[] = [];
 
-    // Step 2: For each place, scrape emails and save
-    const tasks = places
-      .filter((p) => p.website)
-      .map(async (place) => {
-        let emails: string[] = [];
+    // 2. المرور على الشركات لفحص المواقع وحفظها
+    for (const place of places) {
+      const companyName = place.title || "Unknown Company";
+      const website = place.website || "";
+      const phone = place.phone || "";
+      const rating = place.totalScore || null;
+      const reviews = place.reviewsCount || null;
+
+      let emails: string[] = [];
+
+      // إذا كان هناك موقع إلكتروني، نحاول فحص الإيميلات
+      if (website) {
         try {
-          emails = await scrapeEmails(place.website!);
-        } catch (e: unknown) {
-          result.errors.push(`Email scrape failed for ${place.website}: ${e instanceof Error ? e.message : String(e)}`);
+          emails = await scrapeEmails(website);
+        } catch (scraperError) {
+          console.error(`Failed to scrape emails for ${website}:`, scraperError);
         }
+      }
 
-        // Normalize website
-        let website = place.website ?? "";
-        if (!website.startsWith("http")) website = "https://" + website;
-        try {
-          website = new URL(website).hostname.replace("www.", "");
-        } catch {
-          // keep as-is
-        }
-
-        // Parse city/state from address if not present
-        let placeCity = place.city ?? city;
-        let placeState = place.state ?? state;
-        if (!place.city && place.address) {
-          const parts = place.address.split(",").map((s) => s.trim());
-          if (parts.length >= 3) {
-            placeCity = parts[parts.length - 3] ?? city;
-            const stateZip = parts[parts.length - 2] ?? "";
-            placeState = stateZip.split(" ")[0] ?? state;
+      // إذا تم العثور على إيميلات، نقوم بحفظ كل إيميل كـ Lead منفصل
+      if (emails.length > 0) {
+        for (const email of emails) {
+          const isDuplicate = await checkDuplicate(website, email);
+          if (isDuplicate) {
+            skippedDuplicatesCount++;
+            continue;
           }
-        }
 
-        if (emails.length === 0) {
-          // Save company without email if at least website found
-          const lead: Omit<Lead, "id" | "created_at"> = {
-            company_name: place.title,
-            website,
-            email: "",
-            phone: place.phone ?? "",
-            city: placeCity,
-            state: placeState,
-            rating: place.totalScore ?? null,
-            reviews: place.reviewsCount ?? null,
+          const newLead = {
+            company_name: companyName,
+            website: website,
+            email: email,
+            phone: phone,
+            city: city,
+            state: state,
+            rating: rating,
+            reviews: reviews,
           };
 
-          // Check duplicate website
-          const { data: existing } = await supabase
-            .from("leads")
-            .select("id")
-            .eq("website", website)
-            .limit(1);
-
-          if (existing && existing.length > 0) {
-            result.stats.skippedDuplicates++;
-            return;
-          }
-
-          const { data } = await supabase.from("leads").insert([lead]).select().single();
-          if (data) result.leads.push(data);
-        } else {
-          // Save one row per email
-          for (const email of emails) {
-            // Check for duplicate email
-            const { data: existingEmail } = await supabase
-              .from("leads")
-              .select("id")
-              .eq("email", email)
-              .limit(1);
-
-            if (existingEmail && existingEmail.length > 0) {
-              result.stats.skippedDuplicates++;
-              continue;
+          try {
+            const saved = await insertLead(newLead);
+            if (saved) {
+              currentSearchLeads.push(saved);
+              emailsFoundCount++;
             }
-
-            // Also check website (skip if website already saved with same email)
-            const lead: Omit<Lead, "id" | "created_at"> = {
-              company_name: place.title,
-              website,
-              email,
-              phone: place.phone ?? "",
-              city: placeCity,
-              state: placeState,
-              rating: place.totalScore ?? null,
-              reviews: place.reviewsCount ?? null,
-            };
-
-            const { data } = await supabase.from("leads").insert([lead]).select().single();
-            if (data) {
-              result.leads.push(data);
-              result.stats.emailsFound++;
-            }
+          } catch (dbError) {
+            console.error("Database insert error:", dbError);
           }
         }
-      });
+      } else {
+        // التعديل الجوهري: إذا لم يجد إيميل، نحفظ الشركة مفرغة الإيميل لكي تظهر بالجدول!
+        // نتحقق أولاً بالاعتماد على الموقع إذا كان مكرراً
+        const isDuplicate = website ? await checkDuplicate(website, "") : false;
+        
+        if (isDuplicate) {
+          skippedDuplicatesCount++;
+          continue;
+        }
 
-    await Promise.allSettled(tasks);
+        const noEmailLead = {
+          company_name: companyName,
+          website: website,
+          email: "", // فارغ
+          phone: phone,
+          city: city,
+          state: state,
+          rating: rating,
+          reviews: reviews,
+        };
 
-    return NextResponse.json(result);
-  } catch (e: unknown) {
-    console.error("Search error:", e);
+        try {
+          const saved = await insertLead(noEmailLead);
+          if (saved) {
+            currentSearchLeads.push(saved);
+          }
+        } catch (dbError) {
+          console.error("Database insert error for empty email lead:", dbError);
+        }
+      }
+    }
+
+    // إرجاع الإحصائيات مع قائمة البيانات التي تم جلبها في هذا البحث لعرضها فوراً
+    return NextResponse.json({
+      stats: {
+        companiesFound: places.length,
+        emailsFound: emailsFoundCount,
+        skippedDuplicates: skippedDuplicatesCount,
+      },
+      leads: currentSearchLeads,
+    });
+
+  } catch (error: any) {
+    console.error("Search API Error:", error);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Internal server error" },
+      { error: error.message || "Internal Server Error" },
       { status: 500 }
     );
   }
